@@ -1,4 +1,5 @@
 import api.resource.root as root
+import api.resource.contacts as contacts
 
 
 class Routes:
@@ -9,3 +10,6 @@ class Routes:
     def __init__(self, app):
 
         app.add_route("/", root.RootResource())
+
+        # Contacts
+        app.add_route("/contacts", contacts.ContactsCollection())

@@ -35,5 +35,5 @@ DATABASE = {
     "password": config["database"].get("password", ""),
     "host": config["database"].get("host", "localhost"),
     "port": config["database"].get("port", "5432"),
-    "db_name": config["database"].get("db_name", "api"),
+    "database": config["database"].get("database", "api"),
 }
