@@ -1,7 +1,5 @@
 from datetime import datetime, timedelta
 
-from sqlalchemy.sql.expression import null
-
 from services.organisation import get_branch_members
 from sqlalchemy import Column, Date, ForeignKey, Integer, String
 from sqlalchemy.orm import relationship

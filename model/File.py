@@ -25,7 +25,7 @@ class File(Model):
 
     # Meta
     _created_on = Column(DateTime, default=datetime.now())
-    _updated_on = Column(DateTime, onupdate=datetime.now())
+    _updated_on = Column(DateTime, default=datetime.now(), onupdate=datetime.now())
     _created_by = Column(
         Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="SET NULL")
     )

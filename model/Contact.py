@@ -3,7 +3,7 @@ from enum import Enum
 
 from sqlalchemy import Boolean, Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import ForeignKey, Integer, String, Text, BigInteger
 from sqlalchemy.orm import relationship
 
 from model import Model
@@ -25,7 +25,7 @@ class Contact(Model):
     first_language = Column(String(20))
     pronouns = Column(String(10))
     date_of_birth = Column(Date)
-    avatar_id = Column(String(10), ForeignKey("files.id"))
+    avatar_id = Column(String(10))
 
     # Membership
     membership_number = Column(String(15))
@@ -66,6 +66,13 @@ class EmailAddress(Model):
     contact = relationship(
         Contact, backref="email_addresses", foreign_keys=[contact_id]
     )
+
+    def __init__(self, contact, address):
+        self.contact = contact
+        self.address = address.upper()
+
+    def __str__(self):
+        return self.address.upper()
 
     @property
     def is_internal(self):
@@ -114,7 +121,10 @@ class ContactAddress(Model):
     contact_id = Column(
         Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE")
     )
-    uprn = Column(String(15))
+    uprn = Column(
+        BigInteger,
+        ForeignKey("addresses.uprn", onupdate="CASCADE", ondelete="SET NULL"),
+    )
     custom_address = Column(Text)
     mail_to = Column(Boolean, nullable=False, default=True)
     tenure = Column(EnumColumn(Tenure))
@@ -195,15 +205,6 @@ class VerifyToken(Model):
 class Role(Model):
 
     __tablename__ = "auth_roles"
-
-    ROLES = (
-        "global_admin",
-        "members.view",
-        "members.manage",
-        "email.user",
-        "casework.user",
-        "cms.user",
-    )
 
     contact_id = Column(
         Integer,

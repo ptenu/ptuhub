@@ -13,3 +13,4 @@ class Routes:
 
         # Contacts
         app.add_route("/contacts", contacts.ContactsCollection())
+        app.add_route("/contacts/{id}", contacts.ContactCollection())
