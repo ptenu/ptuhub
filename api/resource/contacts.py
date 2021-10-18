@@ -1,8 +1,10 @@
-import falcon
-from falcon import HTTP_204, HTTP_201
-from api.interface.contacts import ContactInterface
-from pydantic import BaseModel, EmailStr
 from typing import List, Optional
+
+import api.middleware.authentication as auth
+import falcon
+from api.interface.contacts import ContactInterface
+from falcon import HTTP_201, HTTP_204
+from pydantic import BaseModel, EmailStr
 
 
 class EmailSchema(BaseModel):
@@ -45,18 +47,19 @@ class ContactList(BaseModel):
         orm_mode = True
 
 
-class ContactsCollection:
-    def on_get(self, req, resp):
+class ContactsResource:
+    @falcon.before(auth.EnforceRoles, ["contacts.manage", "contacts.view"])
+    def on_get_collection(self, req, resp):
         """
         Get a list of contacts
         """
-        contacts_interface = ContactInterface()
+        contacts_interface = ContactInterface(self.session)
 
         contacts = contacts_interface.get_all_contacts()
         m = ContactList().parse_obj({"contacts": contacts})
         resp.text = m.json()
 
-    def on_post(self, req, resp):
+    def on_post_collection(self, req, resp):
         """
         Create a new contact
         """
@@ -76,23 +79,35 @@ class ContactsCollection:
 
         parsed_body = ContactSchema().parse_obj(contact)
 
-        new_contact = ContactInterface().create_new_contact(parsed_body)
+        new_contact = ContactInterface(self.session).create_new_contact(parsed_body)
 
         resp.text = ContactSchema().from_orm(new_contact).json()
         resp.status = HTTP_201
 
+    @falcon.before(auth.EnforceRoles, ["contacts.manage", "contacts.view"])
+    def on_get_single(self, req, resp, id):
+        """
+        Return a single contact
+        """
 
-class ContactCollection:
-    def on_get(self, req, resp, id):
-        contacts_interface = ContactInterface()
+        contacts_interface = ContactInterface(self.session)
         contact = contacts_interface.get_contact(id)
         contact = ContactSchema().from_orm(contact)
         resp.text = contact.json()
 
-    def on_patch(self, req, resp, id):
-        contacts_interface = ContactInterface()
+    @falcon.before(auth.EnforceRoles, ["contacts.manage"])
+    def on_patch_single(self, req, resp, id):
+        """
+        Update specified fields on a contact
+        """
 
-    def on_delete(self, req, resp, id):
-        contacts_interface = ContactInterface()
+        contacts_interface = ContactInterface(self.session)
+
+    @falcon.before(auth.EnforceRoles, ["global.admin"])
+    def on_delete_single(self, req, resp, id):
+        """
+        Delete a specified contact
+        """
+        contacts_interface = ContactInterface(self.session)
         contacts_interface.delete_contact(id)
         resp.status = HTTP_204

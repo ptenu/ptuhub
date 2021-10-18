@@ -1,4 +1,5 @@
 import uuid, json, jwt
+from falcon.errors import HTTPForbidden
 from settings import config
 from model.Contact import Contact
 from datetime import timedelta, datetime
@@ -15,6 +16,7 @@ class User:
     authenticated: bool = False
     anonymous: bool = True
     contact: Contact = None
+    roles = []
 
     def __init__(self, id: str = None, contact: Contact = None):
         self.valid_for = timedelta(minutes=15)
@@ -24,6 +26,9 @@ class User:
             self.anonymous = False
             self.authenticated = True
 
+            for r in contact.roles:
+                self.roles.append(r.name)
+
         if id is not None:
             self.id = id
 
@@ -31,18 +36,21 @@ class User:
             self.id = uuid.uuid4()
 
     def get_claims(self):
+        exp = datetime.now() + self.valid_for
         claims = {
             "sub": self.id,
             "iss": "ptu-hub-api",
-            "iat": datetime.now(),
-            "nbf": datetime.now(),
-            "exp": datetime.now() + self.valid_for,
+            "type": "auth",
+            "iat": datetime.now().timestamp(),
+            "nbf": datetime.now().timestamp(),
+            "exp": exp.timestamp(),
             "anon": True,
+            "roles": self.roles,
         }
 
         if self.contact is not None:
-            claims.email = self.contact.prefered_email
-            claims.anon = False
+            claims["email"] = self.contact.prefered_email
+            claims["anon"] = False
 
         return claims
 
@@ -55,11 +63,18 @@ class User:
 
 
 def get_contact_from_token(token):
+    token = token[7:]
     claims = jwt.decode(
         token, config["default"].get("secret", "--a-key--"), algorithms=["HS256"]
     )
 
-    if claims.anon == True:
+    if claims["iss"] != "ptu-hub-api":
+        raise HTTPForbidden(description="There was a problem with the token provided.")
+
+    if claims["type"] != "auth":
         return None
 
-    return db.query(Contact).get(Contact.id == claims.sub)
+    if claims["anon"] == True:
+        return None
+
+    return db.query(Contact).get(claims["sub"])

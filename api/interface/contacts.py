@@ -1,15 +1,18 @@
 from falcon.errors import HTTPNotFound
-from model import Session as db
+from model import Session
 from model.Contact import Contact
 
 
 class ContactInterface:
+    def __init__(self, session: Session):
+        self.db = session
+
     def get_all_contacts(self):
         """
         Return list containing all contacts
         """
 
-        contacts = db.query(Contact).all()
+        contacts = self.db.query(Contact).all()
 
         return contacts
 
@@ -18,7 +21,7 @@ class ContactInterface:
         Get a single contact
         """
 
-        contact = db.query(Contact).get(id)
+        contact = self.db.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound
 
@@ -32,12 +35,12 @@ class ContactInterface:
         contact = contact.dict(exclude_unset=True)
 
         new_contact = Contact()
-        db.add(new_contact)
+        self.db.add(new_contact)
 
         for key in contact:
             setattr(new_contact, key, contact[key])
 
-        db.commit()
+        self.db.commit()
 
         return new_contact
 
@@ -46,14 +49,14 @@ class ContactInterface:
         Perform a partial update on a contact
         """
 
-        contact = db.query(Contact).get(id)
+        contact = self.db.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound
 
         for key in fields:
             setattr(contact, key, contact[key])
 
-        db.commit()
+        self.db.commit()
 
         return contact
 
@@ -62,11 +65,11 @@ class ContactInterface:
         Delete a contact
         """
 
-        contact = db.query(Contact).get(id)
+        contact = self.db.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound
 
-        db.delete(contact)
-        db.commit()
+        self.db.delete(contact)
+        self.db.commit()
 
         return
