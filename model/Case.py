@@ -1,11 +1,29 @@
 from datetime import datetime
 
-from sqlalchemy import Column, Date, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import (
+    Column,
+    DateTime,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    BigInteger,
+)
 from sqlalchemy.orm import relationship, backref
 from sqlalchemy import Enum as EnumColumn
 from enum import Enum
 
-from model import Model
+from sqlalchemy.sql.schema import Table
+
+from model import Model, Session as db
+
+
+case_files = Table(
+    "case_files",
+    Model.metadata,
+    Column("case_id", ForeignKey("cases.id")),
+    Column("file_id", ForeignKey("files.id")),
+)
 
 
 class Case(Model):
@@ -27,12 +45,14 @@ class Case(Model):
         "Contact", backref="cases_created", foreign_keys=[_created_by]
     )
 
+    files = relationship("File", secondary=case_files)
+
     @property
     def status(self):
-        try:
-            return self.status_history[0].name
-        except:
-            return None
+        status = db.query(Case).join(Case.status_history).first()
+        if status is not None:
+            return status.name
+        return None
 
 
 class CaseContacts(Model):
@@ -105,6 +125,7 @@ class CaseText(Model):
         ForeignKey("cases.id", onupdate="CASCADE", ondelete="CASCADE"),
         nullable=False,
     )
+    title = Column(String(150), nullable=True)
     content = Column(Text, nullable=False)
     started = Column(DateTime)
     finished = Column(DateTime)
@@ -125,3 +146,30 @@ class CaseText(Model):
         "Contact", backref="case_text_added", foreign_keys=[_created_by]
     )
     case = relationship(Case, backref=backref("texts", order_by=_created_on.desc()))
+
+
+class CaseAddress(Model):
+
+    __tablename__ = "case_addresses"
+
+    case_id = Column(
+        Integer,
+        ForeignKey("cases.id", onupdate="CASCADE", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    uprn = Column(
+        BigInteger, ForeignKey("addresses.uprn", ondelete="CASCADE"), primary_key=True
+    )
+    reference = Column(String(25), nullable=False, index=True)
+    description = Column(Text)
+
+    _created_on = Column(DateTime, default=datetime.now(), nullable=False)
+    _created_by = Column(
+        Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="SET NULL")
+    )
+
+    created_by = relationship(
+        "Contact", backref="case_address_added", foreign_keys=[_created_by]
+    )
+    case = relationship(Case, backref=backref("addresses", order_by=_created_on))
+    address = relationship("Address", backref="cases")

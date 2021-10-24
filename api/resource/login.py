@@ -1,11 +1,16 @@
+from datetime import datetime, timedelta
+
+from cryptography.hazmat.primitives import serialization
+
+import api.middleware.authentication as auth
+import falcon
 import jwt
 from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPForbidden, HTTPNotFound, HTTPUnauthorized
 from model.Contact import Contact
 from passlib.hash import argon2
-from services.auth import User
+from services.auth import User, token_refresh, PRIV_KEY, PUB_KEY
 from settings import config
-from datetime import datetime, timedelta
 
 
 class PasswordResource:
@@ -33,12 +38,11 @@ class PasswordResource:
 
         resp.status = HTTP_204
 
+    @falcon.before(auth.EnforceRoles, ["global.admin"])
     def on_put_contact(self, req, resp, contact_id):
         """
         Change a specified contact's password
         """
-
-        # TODO: Add permissions
 
         contact = self.session.query(Contact).get(contact_id)
         if contact is None:
@@ -55,8 +59,13 @@ class PasswordResource:
 
 
 class TokenResource:
-    def on_get_token(self, req, resp):
-        pass
+    def on_get_pk(self, req, resp):
+        key = PUB_KEY.public_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PublicFormat.SubjectPublicKeyInfo,
+        )
+        resp.data = key
+        resp.content_type = falcon.MEDIA_TEXT
 
     def on_post_token(self, req, resp):
         """
@@ -92,12 +101,12 @@ class TokenResource:
                 "sub": contact.id,
                 "type": "refresh",
                 "iss": "ptu-hub-api",
-                "iat": datetime.now(),
-                "nbf": datetime.now(),
-                "exp": datetime.now() + timedelta(days=7),
+                "iat": datetime.now().timestamp(),
+                "nbf": (datetime.now() - timedelta(seconds=10)).timestamp(),
+                "exp": (datetime.now() + timedelta(days=7)).timestamp(),
             },
-            config["default"].get("secret", "--a-key--"),
-            algorithm="HS256",
+            PRIV_KEY,
+            algorithm="RS256",
         )
 
         user = User(contact.id, contact)
@@ -105,3 +114,17 @@ class TokenResource:
             "auth_token": user.get_auth_token(),
             "refresh_token": rt,
         }
+
+    def on_post_refresh(self, req, resp):
+        """
+        Provide a new authentication token from a refresh token
+        """
+
+        refresh_token = req.media["token"]
+        if refresh_token is None:
+            raise HTTPBadRequest(description="Please provide a refresh token")
+
+        try:
+            resp.media = {"token": token_refresh(refresh_token)}
+        except:
+            raise HTTPBadRequest(description="The token provided was invalid")

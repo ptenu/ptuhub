@@ -25,7 +25,7 @@ class Contact(Model):
     first_language = Column(String(20))
     pronouns = Column(String(10))
     date_of_birth = Column(Date)
-    avatar_id = Column(String(10))
+    avatar_id = Column(String(10), ForeignKey("files.id"))
 
     # Membership
     membership_number = Column(String(15))
@@ -48,6 +48,11 @@ class Contact(Model):
     telephone = relationship(
         "TelephoneNumber", backref="main_for", foreign_keys=[prefered_phone]
     )
+    avatar = relationship("File", backref="avatar_user", foreign_keys=[avatar_id])
+
+    @property
+    def name(self, legal: bool = False):
+        return self.given_name.capitalize() + " " + self.family_name.capitalize()
 
 
 class EmailAddress(Model):

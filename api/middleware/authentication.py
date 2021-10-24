@@ -20,7 +20,7 @@ class UserAuthManager:
         try:
             user = get_contact_from_token(token)
         except:
-            raise HTTPForbidden(
+            raise HTTPUnauthorized(
                 description="There was a problem with the token you provided."
             )
 

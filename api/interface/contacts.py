@@ -1,5 +1,6 @@
 from falcon.errors import HTTPNotFound
 from model import Session
+from model.File import File
 from model.Contact import Contact
 
 
