@@ -1,15 +1,14 @@
 from datetime import datetime, timedelta
 
-from cryptography.hazmat.primitives import serialization
-
 import api.middleware.authentication as auth
 import falcon
 import jwt
+from cryptography.hazmat.primitives import serialization
 from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPForbidden, HTTPNotFound, HTTPUnauthorized
 from model.Contact import Contact
 from passlib.hash import argon2
-from services.auth import User, token_refresh, PRIV_KEY, PUB_KEY
+from services.auth import PRIV_KEY, PUB_KEY, User, token_refresh
 from settings import config
 
 
