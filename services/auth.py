@@ -105,7 +105,7 @@ class User:
     roles = []
 
     def __init__(self, id: str = None, contact: Contact = None):
-        self.valid_for = timedelta(minutes=15)
+        self.valid_for = timedelta(minutes=10)
         self.roles = []
 
         if contact is not None:
