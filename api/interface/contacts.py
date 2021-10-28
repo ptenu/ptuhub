@@ -50,12 +50,14 @@ class ContactInterface:
         Perform a partial update on a contact
         """
 
+        fields = fields.dict(exclude_unset=True)
+
         contact = self.db.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound
 
         for key in fields:
-            setattr(contact, key, contact[key])
+            setattr(contact, key, fields[key])
 
         self.db.commit()
 

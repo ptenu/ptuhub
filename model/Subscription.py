@@ -1,13 +1,15 @@
+import uuid
 from datetime import date, datetime, timedelta
-from dateutil.relativedelta import relativedelta
 from enum import Enum
 
-from sqlalchemy import Boolean, Column, Date, DateTime
+from dateutil.relativedelta import relativedelta
+from sqlalchemy import Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
-from sqlalchemy import ForeignKey, Integer, String, Text, BigInteger
-from sqlalchemy.orm import relationship, backref
+from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy.orm import backref, relationship
 
-from model import Model, Session as db
+from model import Model
+from model import Session as db
 
 
 class Subscription(Model):
@@ -157,7 +159,7 @@ class MembershipCard(Model):
     date = Column(Date, default=datetime.today())
     barcode_img_id = Column(String(10), ForeignKey("files.id"))
 
-    contact = relationship("Contact", back_populates="membership_cards")
+    contact = relationship("Contact", backref="membership_cards")
 
     def __init__(self, contact):
         self.contact = contact
@@ -167,3 +169,21 @@ class MembershipCard(Model):
         name = self.contact.family_name[:4].upper()
         urn = self.contact.membership_number
         return f"{str(self.date.month).zfill(3)}{name}{self.date.year}{urn}0"
+
+
+class OnboardingToken(Model):
+
+    __tablename__ = "onboarding_tokens"
+
+    id = Column(String(255), primary_key=True)
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
+    )
+
+    contact = relationship("Contact", backref="ob_tokens")
+
+    def __init__(self, contact=None):
+        if contact is not None:
+            self.contact = contact
+
+        self.id = uuid.uuid4()

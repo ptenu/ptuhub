@@ -3,7 +3,7 @@ from typing import List, Optional
 import api.middleware.authentication as auth
 import falcon
 from api.interface.contacts import ContactInterface
-from falcon import HTTP_201, HTTP_204
+from falcon import HTTP_201, HTTP_204, HTTP_200
 from pydantic import BaseModel, EmailStr
 
 
@@ -101,7 +101,24 @@ class ContactsResource:
         Update specified fields on a contact
         """
 
+        body = req.get_media(default_when_empty=None)
+
+        if body is None:
+            raise falcon.HTTPBadRequest(description="Empty body")
+
+        if "contact" not in body:
+            raise falcon.HTTPBadRequest(
+                description="Body must contain a person element."
+            )
+
         contacts_interface = ContactInterface(self.session)
+
+        contact = body["contact"]
+        parsed_body = ContactSchema().parse_obj(contact)
+
+        updated_contact = contacts_interface.update_contact(id, parsed_body)
+        resp.text = ContactSchema().from_orm(updated_contact).json()
+        resp.status = HTTP_200
 
     @falcon.before(auth.EnforceRoles, ["global.admin"])
     def on_delete_single(self, req, resp, id):
