@@ -128,6 +128,8 @@ class User:
             "sub": self.id,
             "iss": "ptu-hub-api",
             "type": "auth",
+            "email": self.contact.prefered_email,
+            "name": self.contact.name,
             "iat": datetime.now().timestamp(),
             "nbf": (datetime.now() - timedelta(seconds=10)).timestamp(),
             "exp": exp.timestamp(),
