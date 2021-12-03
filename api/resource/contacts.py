@@ -72,7 +72,7 @@ class ContactsResource:
 
         if "contact" not in body:
             raise falcon.HTTPBadRequest(
-                description="Body must contain a person element."
+                description="Body must contain a contact element."
             )
 
         contact = body["contact"]

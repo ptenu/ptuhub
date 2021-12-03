@@ -52,7 +52,41 @@ class Contact(Model):
 
     @property
     def name(self, legal: bool = False):
+        if legal:
+            return f"{self.family_name.upper()}, {self.given_name.capitalize()}"
+
         return self.given_name.capitalize() + " " + self.family_name.capitalize()
+
+    @property
+    def active_subscription(self):
+        if self.subscriptions is None:
+            return None
+
+        for s in self.subscriptions:
+            if s.status.name in ("CANCELLED", "REJECTED", "LAPSED"):
+                continue
+
+            return s
+
+        return None
+
+
+class ContactAttribute(Model):
+
+    __tablename__ = "contact_attributes"
+
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE")
+    )
+    key = Column(String(15), primary_key=True)
+    val = Column(String(255), nullable=False)
+
+    # Meta
+    _created_on = Column(DateTime, default=datetime.now())
+    _updated_on = Column(DateTime, onupdate=datetime.now())
+
+    # Relationships
+    contact = relationship(Contact, backref="attributes", foreign_keys=[contact_id])
 
 
 class EmailAddress(Model):
@@ -135,9 +169,7 @@ class ContactAddress(Model):
     tenure = Column(EnumColumn(Tenure))
     active = Column(Boolean, nullable=False, default=True)
 
-    # Table relation
-    # Relationships
-    contact = relationship(Contact, backref="addresses")
+    contact = relationship(Contact, backref="address_relations")
 
 
 class Consent(Model):
