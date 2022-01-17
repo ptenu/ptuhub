@@ -4,6 +4,7 @@ from sqlalchemy.sql.sqltypes import Boolean
 from model import Session
 from model.Content import Page
 from model.File import File
+from slugify import slugify
 
 
 class ContentInterface:
@@ -38,6 +39,9 @@ class ContentInterface:
         for key, value in kwargs.items():
             if key == "id":
                 continue
+
+            if key == "title" and page.slug is None:
+                page.slug = slugify(value)
 
             if hasattr(page, key):
                 setattr(page, key, value)

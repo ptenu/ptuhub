@@ -4,47 +4,7 @@ import api.middleware.authentication as auth
 import falcon
 from api.interface.contacts import ContactInterface
 from falcon import HTTP_201, HTTP_204, HTTP_200
-from pydantic import BaseModel, EmailStr
-
-
-class EmailSchema(BaseModel):
-    address: Optional[EmailStr] = None
-    blocked: bool
-    verified: bool
-
-    class Config:
-        orm_mode = True
-
-
-class TelSchema(BaseModel):
-    number: Optional[str] = None
-    blocked: bool
-    verified: bool
-
-    class Config:
-        orm_mode = True
-
-
-class ContactSchema(BaseModel):
-    id: Optional[int] = None
-    given_name: Optional[str] = None
-    family_name: Optional[str] = None
-    other_names: Optional[str] = None
-    email: Optional[EmailSchema] = None
-    telephone: Optional[TelSchema] = None
-    first_language: Optional[str] = None
-    pronouns: Optional[str] = None
-
-    class Config:
-        orm_mode = True
-
-
-class ContactList(BaseModel):
-
-    contacts: List[ContactSchema] = []
-
-    class Config:
-        orm_mode = True
+import json
 
 
 class ContactsResource:
@@ -56,8 +16,12 @@ class ContactsResource:
         contacts_interface = ContactInterface(self.session)
 
         contacts = contacts_interface.get_all_contacts()
-        m = ContactList().parse_obj({"contacts": contacts})
-        resp.text = m.json()
+
+        contacts_mapped = []
+        for c in contacts:
+            contacts_mapped.append(c.dict)
+
+        resp.text = json.dumps({"contacts": contacts_mapped})
 
     def on_post_collection(self, req, resp):
         """
@@ -72,16 +36,13 @@ class ContactsResource:
 
         if "contact" not in body:
             raise falcon.HTTPBadRequest(
-                description="Body must contain a person element."
+                description="Body must contain a contact element."
             )
 
         contact = body["contact"]
+        new_contact = ContactInterface(self.session).create_new_contact(contact)
 
-        parsed_body = ContactSchema().parse_obj(contact)
-
-        new_contact = ContactInterface(self.session).create_new_contact(parsed_body)
-
-        resp.text = ContactSchema().from_orm(new_contact).json()
+        resp.text = json.dumps(new_contact.dict)
         resp.status = HTTP_201
 
     @falcon.before(auth.EnforceRoles, ["contacts.manage", "contacts.view"])
@@ -92,8 +53,7 @@ class ContactsResource:
 
         contacts_interface = ContactInterface(self.session)
         contact = contacts_interface.get_contact(id)
-        contact = ContactSchema().from_orm(contact)
-        resp.text = contact.json()
+        resp.text = json.dumps(contact.dict_ext)
 
     @falcon.before(auth.EnforceRoles, ["contacts.manage"])
     def on_patch_single(self, req, resp, id):
@@ -114,10 +74,9 @@ class ContactsResource:
         contacts_interface = ContactInterface(self.session)
 
         contact = body["contact"]
-        parsed_body = ContactSchema().parse_obj(contact)
 
-        updated_contact = contacts_interface.update_contact(id, parsed_body)
-        resp.text = ContactSchema().from_orm(updated_contact).json()
+        updated_contact = contacts_interface.update_contact(id, contact)
+        resp.text = json.dumps(updated_contact.dict_ext)
         resp.status = HTTP_200
 
     @falcon.before(auth.EnforceRoles, ["global.admin"])

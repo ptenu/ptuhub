@@ -13,7 +13,7 @@ class ContactInterface:
         Return list containing all contacts
         """
 
-        contacts = self.db.query(Contact).all()
+        contacts = self.db.query(Contact).order_by(Contact._created_on.desc()).all()
 
         return contacts
 
@@ -33,13 +33,10 @@ class ContactInterface:
         Create a new contact
         """
 
-        contact = contact.dict(exclude_unset=True)
-
         new_contact = Contact()
         self.db.add(new_contact)
 
-        for key in contact:
-            setattr(new_contact, key, contact[key])
+        new_contact.dict = contact
 
         self.db.commit()
 
@@ -56,8 +53,7 @@ class ContactInterface:
         if contact is None:
             raise HTTPNotFound
 
-        for key in fields:
-            setattr(contact, key, fields[key])
+        contact.dict = fields
 
         self.db.commit()
 

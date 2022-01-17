@@ -1,9 +1,11 @@
+import json
 from datetime import datetime, timedelta
 from enum import Enum
+from typing import Dict
 
-from sqlalchemy import Boolean, Column, Date, DateTime
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
-from sqlalchemy import ForeignKey, Integer, String, Text, BigInteger
+from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from model import Model
@@ -51,8 +53,67 @@ class Contact(Model):
     avatar = relationship("File", backref="avatar_user", foreign_keys=[avatar_id])
 
     @property
-    def name(self, legal: bool = False):
+    def name(self):
         return self.given_name.capitalize() + " " + self.family_name.capitalize()
+
+    @property
+    def legal_name(self):
+        name = self.family_name.upper() + ", " + self.given_name.capitalize()
+        if self.other_names is not None:
+            name += " " + self.other_names.capitalize()
+        return name
+
+    @property
+    def dict(self):
+        status = None
+        obj = {
+            "id": self.id,
+            "name": self.name,
+            "legal_name": self.legal_name,
+            "email": self.prefered_email,
+            "membership_number": self.membership_number,
+            "status": status,
+        }
+        return obj
+
+    @property
+    def dict_ext(self):
+        status = None
+        obj = {
+            "id": self.id,
+            "name": self.name,
+            "legal_name": self.legal_name,
+            "date_of_birth": self.date_of_birth.isoformat()
+            if self.date_of_birth is not None
+            else None,
+            "joined_on": self.joined_on.isoformat()
+            if self.joined_on is not None
+            else None,
+            "membership_type": self.membership_type,
+            "account_blocked": self.account_blocked,
+            "email": self.prefered_email,
+            "telephone": self.prefered_phone,
+            "membership_number": self.membership_number,
+            "status": status,
+            "created": self._created_on.isoformat()
+            if self._created_on is not None
+            else None,
+            "updated": self._updated_on.isoformat()
+            if self._updated_on is not None
+            else None,
+        }
+        return obj
+
+    @dict.setter
+    def dict(self, values: Dict):
+        for key, val in values.items():
+            if val is None:
+                continue
+            if hasattr(self, key):
+                try:
+                    setattr(self, key, val)
+                except:
+                    pass
 
 
 class EmailAddress(Model):

@@ -1,0 +1,43 @@
+Falcon App (WSGI)
+• Routes:
+    ⇒ / - RootResource:
+       └── GET - on_get
+    ⇒ /token - TokenResource:
+       └── POST - on_post_token
+    ⇒ /password - PasswordResource:
+       └── PUT - on_put_self
+    ⇒ /password/{contact_id} - PasswordResource:
+       └── PUT - on_put_contact
+    ⇒ /refresh - TokenResource:
+       └── POST - on_post_refresh
+    ⇒ /.well-known/jwpub.pem - TokenResource:
+       └── GET - on_get_pk
+    ⇒ /contacts - ContactsResource:
+       ├── GET - on_get_collection
+       └── POST - on_post_collection
+    ⇒ /contacts/{id} - ContactsResource:
+       ├── DELETE - on_delete_single
+       ├── GET - on_get_single
+       └── PATCH - on_patch_single
+    ⇒ /pages - PublicPageResource:
+       └── GET - on_get_all
+    ⇒ /pages/category/{category} - PublicPageResource:
+       └── GET - on_get_category
+    ⇒ /pages/{slug} - PublicPageResource:
+       └── GET - on_get_page
+    ⇒ /pages/manage - AdminPageResource:
+       ├── GET - on_get_pages
+       └── POST - on_post_pages
+    ⇒ /pages/manage/{slug} - AdminPageResource:
+       ├── DELETE - on_delete_page
+       ├── GET - on_get_page
+       └── PATCH - on_patch_page
+• Middleware (Middleware are independent):
+    → UserAuthManager.process_request
+
+      ↣ SQLAlchemySessionManager.process_resource
+
+          ├── Process route responder
+
+      ↢ CORSMiddleware.process_response
+    ↢ SQLAlchemySessionManager.process_response
