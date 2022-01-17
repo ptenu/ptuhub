@@ -196,9 +196,7 @@ class ContactAddress(Model):
     tenure = Column(EnumColumn(Tenure))
     active = Column(Boolean, nullable=False, default=True)
 
-    # Table relation
-    # Relationships
-    contact = relationship(Contact, backref="addresses")
+    contact = relationship(Contact, backref="address_relations")
 
 
 class Consent(Model):
