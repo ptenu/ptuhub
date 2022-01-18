@@ -19,6 +19,7 @@ class File(Model):
     bucket = Column(String(50))
     key = Column(String(1024))
     description = Column(Text)
+    public_url = Column(Text, nullable=True)
     delete_after = Column(
         DateTime, nullable=True, default=datetime.today() + timedelta(hours=3)
     )

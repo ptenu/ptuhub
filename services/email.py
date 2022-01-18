@@ -10,7 +10,7 @@ from model import Session as db
 ses = boto3.client(
     "sesv2",
     aws_access_key_id=settings.config["aws"].get("access_key"),
-    aws_secret_access_key=settings.config["aws"].get("secret_key"),
+    aws_secret_access_key=settings.config["aws"].get("secret"),
     region_name="eu-west-1",
 )
 

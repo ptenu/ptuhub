@@ -1,7 +1,10 @@
+from datetime import datetime
 from falcon.errors import HTTPNotFound
 from model import Session
 from model.File import File
+import tempfile
 from model.Contact import Contact
+from services.files import FileService
 
 
 class ContactInterface:
@@ -72,3 +75,31 @@ class ContactInterface:
         self.db.commit()
 
         return
+
+    def put_avatar(self, id, image):
+        """
+        Upload an avatar and attach it to the user
+        """
+
+        contact = self.db.query(Contact).get(id)
+        if contact is None:
+            raise HTTPNotFound
+
+        fs = FileService()
+        file = File()
+        file.mime_type = image.content_type
+        file.ext = str(image.secure_filename).split(".")[-1]
+
+        timestamp = datetime.now().strftime("%y%m%d_%H%M%S")
+        new_file_key = f"usrimg/{contact.id}/{timestamp}.{file.ext}"
+
+        file.name = f"usrimg_{contact.id}_{timestamp}.{file.ext}"
+        file.bucket, file.key = fs.store_file_public(image.stream, new_file_key)
+        file.size = fs.get_file_size(file)
+        file.public_url = fs.get_public_url(file)
+        file.delete_after = None
+
+        self.db.add(file)
+        self.db.commit()
+
+        return file

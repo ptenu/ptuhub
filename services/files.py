@@ -6,8 +6,8 @@ import settings
 
 s3 = boto3.client(
     "s3",
-    aws_access_key_id=settings.config["aws"].get("aws_access_key_id"),
-    aws_secret_access_key=settings.config["aws"].get("aws_secret_access_key"),
+    aws_access_key_id=settings.config["aws"].get("access_key"),
+    aws_secret_access_key=settings.config["aws"].get("secret"),
 )
 
 
@@ -44,6 +44,14 @@ class FileService:
 
         return self.CDN_ROOT_URL + file.key
 
+    def get_file_size(self, file):
+        """
+        Returns the size in bites of a file
+        """
+
+        obj_info = s3.ObjectSummary(file.bucket, file.key)
+        return obj_info.size
+
     def store_file_secure(self, file_obj, file_id):
         """
         Stores a file in a secure bucket which can only be accessed by authorised users
@@ -66,7 +74,7 @@ class FileService:
         Download a file from S3
         """
 
-        with tempfile.NamedTemporaryFile() as temp:
+        with tempfile.TemporaryFile() as temp:
             try:
                 s3.download_fileobj(bucket, key, temp)
             except:
