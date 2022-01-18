@@ -1,5 +1,7 @@
 from typing import List, Optional
 
+from falcon.errors import HTTPBadRequest
+
 import api.middleware.authentication as auth
 import falcon
 from api.interface.contacts import ContactInterface
@@ -87,3 +89,23 @@ class ContactsResource:
         contacts_interface = ContactInterface(self.session)
         contacts_interface.delete_contact(id)
         resp.status = HTTP_204
+
+
+class AvatarResource:
+    @falcon.before(auth.EnforceRoles, ["contacts.manage"])
+    def on_put(self, req, resp, contact_id):
+
+        form = req.get_media()
+        image = None
+        for part in form:
+            if part.name == "avatar":
+                image = part
+
+        if image is None:
+            raise HTTPBadRequest(
+                "Missing parameter",
+                "Please include an image you wish to use as an avatar",
+            )
+
+        contacts_interface = ContactInterface(self.session)
+        contacts_interface.put_avatar(contact_id, image)
