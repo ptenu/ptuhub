@@ -2,6 +2,7 @@ import tempfile
 
 import boto3
 import falcon
+from falcon.errors import HTTPInternalServerError
 import settings
 
 s3 = boto3.client(
@@ -24,7 +25,7 @@ class FileService:
         """
 
         env_name = settings.config["default"].get("env", "default")
-        path = f"{env_name}/{file_id}"
+        path = f"hub/{env_name}/{file_id}"
         try:
             s3.upload_fileobj(file_obj, self.CDN_BUCKET, path)
         except:
@@ -42,15 +43,15 @@ class FileService:
         if file.bucket != self.CDN_BUCKET:
             raise falcon.HTTPNotFound()
 
-        return self.CDN_ROOT_URL + file.key
+        return self.CDN_ROOT_URL + "/" + file.key
 
     def get_file_size(self, file):
         """
         Returns the size in bites of a file
         """
 
-        obj_info = s3.ObjectSummary(file.bucket, file.key)
-        return obj_info.size
+        obj_info = s3.head_object(Bucket=file.bucket, Key=file.key)
+        return obj_info["ContentLength"]
 
     def store_file_secure(self, file_obj, file_id):
         """
@@ -82,3 +83,10 @@ class FileService:
                     description="There was an error attempting to retrieve the file."
                 )
             return temp
+
+    def erase_file(self, bucket, key):
+        try:
+            response = s3.delete_object(Bucket=bucket, Key=key)
+        except:
+            raise HTTPInternalServerError
+        return response

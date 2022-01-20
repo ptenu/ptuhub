@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from sqlalchemy import Column, Date, DateTime
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+import random, base64
 
 from model import Model
 
@@ -32,3 +33,8 @@ class File(Model):
     )
 
     uploaded_by = relationship("Contact", backref="files", foreign_keys=[_created_by])
+
+    def __init__(self) -> None:
+        bytes = random.randbytes(8)
+        code = base64.b64encode(bytes)
+        self.id = code.decode("ascii")[:10]

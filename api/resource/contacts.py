@@ -1,3 +1,4 @@
+import tempfile
 from typing import List, Optional
 
 from falcon.errors import HTTPBadRequest
@@ -93,19 +94,27 @@ class ContactsResource:
 
 class AvatarResource:
     @falcon.before(auth.EnforceRoles, ["contacts.manage"])
-    def on_put(self, req, resp, contact_id):
+    def on_put(self, req, resp, id):
 
         form = req.get_media()
-        image = None
-        for part in form:
-            if part.name == "avatar":
-                image = part
+        did_the_user_upload_an_image = False
 
-        if image is None:
+        for part in form:
+            if part.name != "avatar":
+                continue
+
+            did_the_user_upload_an_image = True
+
+            with tempfile.TemporaryFile() as tmp_image:
+                tmp_image.write(part.stream.read())
+                contacts_interface = ContactInterface(self.session)
+                contacts_interface.put_avatar(id, tmp_image)
+                break
+
+        if not did_the_user_upload_an_image:
             raise HTTPBadRequest(
                 "Missing parameter",
                 "Please include an image you wish to use as an avatar",
             )
 
-        contacts_interface = ContactInterface(self.session)
-        contacts_interface.put_avatar(contact_id, image)
+        resp.status = HTTP_201

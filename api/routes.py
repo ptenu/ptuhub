@@ -25,6 +25,7 @@ class Routes:
         # Contacts
         app.add_route("/contacts", contacts.ContactsResource(), suffix="collection")
         app.add_route("/contacts/{id}", contacts.ContactsResource(), suffix="single")
+        app.add_route("/contacts/{id}/avatar", contacts.AvatarResource())
 
         # Content
         app.add_route("/pages", content.PublicPageResource(), suffix="all")

@@ -9,6 +9,7 @@ from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from model import Model
+from services.files import FileService
 
 
 class Contact(Model):
@@ -65,6 +66,14 @@ class Contact(Model):
 
     @property
     def dict(self):
+        fs = FileService()
+        avatar_url = None
+        if self.avatar is not None:
+            try:
+                avatar_url = fs.get_public_url(self.avatar)
+            except:
+                pass
+
         status = None
         obj = {
             "id": self.id,
@@ -73,12 +82,22 @@ class Contact(Model):
             "email": self.prefered_email,
             "membership_number": self.membership_number,
             "status": status,
+            "avatar_url": avatar_url,
         }
         return obj
 
     @property
     def dict_ext(self):
+        fs = FileService()
+
         status = None
+        avatar_url = None
+        if self.avatar is not None:
+            try:
+                avatar_url = fs.get_public_url(self.avatar)
+            except:
+                pass
+
         obj = {
             "id": self.id,
             "name": self.name,
@@ -89,6 +108,7 @@ class Contact(Model):
             "joined_on": self.joined_on.isoformat()
             if self.joined_on is not None
             else None,
+            "avatar_url": avatar_url,
             "membership_type": self.membership_type,
             "account_blocked": self.account_blocked,
             "email": self.prefered_email,
