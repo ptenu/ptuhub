@@ -137,3 +137,15 @@ class ContactInterface:
         self.db.commit()
 
         return file
+
+    def clear_avatar(self, contact_id):
+        contact: Contact = self.db.query(Contact).get(contact_id)
+        if contact is None:
+            raise HTTPNotFound
+
+        fs = FileService()
+        if contact.avatar_id is not None:
+            fs.erase_file(contact.avatar.bucket, contact.avatar.key)
+            self.db.delete(contact.avatar)
+
+        self.db.commit()

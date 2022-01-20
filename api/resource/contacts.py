@@ -118,3 +118,10 @@ class AvatarResource:
             )
 
         resp.status = HTTP_201
+
+    @falcon.before(auth.EnforceRoles, ["contacts.manage"])
+    def on_delete(self, req, resp, id):
+        ci = ContactInterface(self.session)
+        ci.clear_avatar(id)
+
+        resp.status = HTTP_201

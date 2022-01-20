@@ -75,14 +75,14 @@ class FileService:
         Download a file from S3
         """
 
-        with tempfile.TemporaryFile() as temp:
-            try:
-                s3.download_fileobj(bucket, key, temp)
-            except:
-                raise falcon.HTTPInternalServerError(
-                    description="There was an error attempting to retrieve the file."
-                )
-            return temp
+        temp = tempfile.TemporaryFile()
+        try:
+            s3.download_fileobj(bucket, key, temp)
+        except:
+            raise falcon.HTTPInternalServerError(
+                description="There was an error attempting to retrieve the file."
+            )
+        return temp
 
     def erase_file(self, bucket, key):
         try:

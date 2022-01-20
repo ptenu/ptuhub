@@ -1,5 +1,6 @@
 import click
 from cli.contacts import create_contact, set_password
+from cli import address
 from model.File import File
 
 
@@ -11,6 +12,16 @@ def cli():
 @cli.command()
 def test():
     click.echo("Worked.")
+
+
+@cli.command()
+def import_addr():
+    click.echo("Downloading data...")
+    address.download()
+
+    click.echo(click.style("Download complete", fg="green"))
+    click.echo("Importing (this may take a while!")
+    address.do_import()
 
 
 @cli.command()

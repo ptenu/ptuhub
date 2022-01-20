@@ -21,9 +21,7 @@ class File(Model):
     key = Column(String(1024))
     description = Column(Text)
     public_url = Column(Text, nullable=True)
-    delete_after = Column(
-        DateTime, nullable=True, default=datetime.today() + timedelta(hours=3)
-    )
+    delete_after = Column(DateTime, nullable=True)
 
     # Meta
     _created_on = Column(DateTime, default=datetime.now())
@@ -38,3 +36,4 @@ class File(Model):
         bytes = random.randbytes(8)
         code = base64.b64encode(bytes)
         self.id = code.decode("ascii")[:10]
+        self.delete_after = datetime.today() + timedelta(hours=24)
