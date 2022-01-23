@@ -4,25 +4,24 @@ import tempfile
 import api.middleware.authentication as auth
 import falcon
 from api.interface.contacts import ContactInterface
-from falcon import HTTP_200, HTTP_201, HTTP_204
-from falcon.errors import HTTPBadRequest
+from falcon import HTTP_201, HTTP_204
+from falcon.errors import HTTPBadRequest, HTTPNotFound
+from api.schemas.contact import ContactSchema
+from model.Contact import Contact
 
 
 class ContactsResource:
-    @falcon.before(auth.EnforceRoles, ["contacts.manage", "contacts.view"])
+    @falcon.before(auth.EnforceRoles, ["officer", "rep", "organiser"])
     def on_get_collection(self, req, resp):
         """
         Get a list of contacts
         """
-        contacts_interface = ContactInterface(self.session)
+        contacts = (
+            self.session.query(Contact).order_by(Contact._created_on.desc()).all()
+        )
 
-        contacts = contacts_interface.get_all_contacts()
-
-        contacts_mapped = []
-        for c in contacts:
-            contacts_mapped.append(c.dict)
-
-        resp.text = json.dumps({"contacts": contacts_mapped})
+        result = list(map(ContactSchema.map_simple, contacts))
+        resp.text = json.dumps(result)
 
     def on_post_collection(self, req, resp):
         """
@@ -30,57 +29,41 @@ class ContactsResource:
         """
 
         # Get paramaters from body
-        body = req.get_media(default_when_empty=None)
+        body = req.get_media()
 
-        if body is None:
-            raise falcon.HTTPBadRequest(description="Empty body")
+        new_contact = ContactInterface(self.session).create_new_contact(body)
+        schema = ContactSchema(new_contact)
 
-        if "contact" not in body:
-            raise falcon.HTTPBadRequest(
-                description="Body must contain a contact element."
-            )
+        resp.text = json.dumps(schema.extended)
 
-        contact = body["contact"]
-        new_contact = ContactInterface(self.session).create_new_contact(contact)
-
-        resp.text = json.dumps(new_contact.dict)
-        resp.status = HTTP_201
-
-    @falcon.before(auth.EnforceRoles, ["contacts.manage", "contacts.view"])
+    @falcon.before(auth.EnforceRoles, ["officer", "rep", "organiser"])
     def on_get_single(self, req, resp, id):
         """
         Return a single contact
         """
 
-        contacts_interface = ContactInterface(self.session)
-        contact = contacts_interface.get_contact(id)
-        resp.text = json.dumps(contact.dict_ext)
+        contact = self.session.query(Contact).get(id)
+        if contact is None:
+            raise HTTPNotFound
 
-    @falcon.before(auth.EnforceRoles, ["contacts.manage"])
+        schema = ContactSchema(contact)
+        resp.text = json.dumps(schema.extended)
+
+    @falcon.before(auth.EnforceRoles, ["officer"])
     def on_patch_single(self, req, resp, id):
         """
         Update specified fields on a contact
         """
 
-        body = req.get_media(default_when_empty=None)
-
-        if body is None:
-            raise falcon.HTTPBadRequest(description="Empty body")
-
-        if "contact" not in body:
-            raise falcon.HTTPBadRequest(
-                description="Body must contain a person element."
-            )
-
+        body = req.get_media()
         contacts_interface = ContactInterface(self.session)
 
-        contact = body["contact"]
+        updated_contact = contacts_interface.update_contact(id, body)
+        schema = ContactSchema(updated_contact)
 
-        updated_contact = contacts_interface.update_contact(id, contact)
-        resp.text = json.dumps(updated_contact.dict_ext)
-        resp.status = HTTP_200
+        resp.text = json.dumps(schema.extended)
 
-    @falcon.before(auth.EnforceRoles, ["global.admin"])
+    @falcon.before(auth.EnforceRoles, ["officer"])
     def on_delete_single(self, req, resp, id):
         """
         Delete a specified contact
@@ -91,7 +74,7 @@ class ContactsResource:
 
 
 class AvatarResource:
-    @falcon.before(auth.EnforceRoles, ["contacts.manage"])
+    @falcon.before(auth.EnforceRoles, ["officer"])
     def on_put(self, req, resp, id):
 
         form = req.get_media()
@@ -117,9 +100,9 @@ class AvatarResource:
 
         resp.status = HTTP_201
 
-    @falcon.before(auth.EnforceRoles, ["contacts.manage"])
+    @falcon.before(auth.EnforceRoles, ["officer"])
     def on_delete(self, req, resp, id):
         ci = ContactInterface(self.session)
         ci.clear_avatar(id)
 
-        resp.status = HTTP_201
+        resp.status = HTTP_204

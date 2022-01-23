@@ -6,7 +6,7 @@ import falcon
 from falcon.errors import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from model.Address import Address, AddressNote, Postcode, Street, SurveyReturn
 from model.Contact import Contact
-from schemas.address import AddressSchema, StreetSchema
+from api.schemas.address import AddressSchema, StreetSchema
 
 
 class AddressResource:
@@ -76,7 +76,7 @@ class AddressResource:
 
         note.withdrawn = True
         self.session.commit()
-        resp.status = 200
+        resp.status = 204
 
     def on_get_postcode(self, req, resp, outcode: str, incode: str):
         """

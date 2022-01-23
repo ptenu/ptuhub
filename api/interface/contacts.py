@@ -13,27 +13,7 @@ class ContactInterface:
     def __init__(self, session: Session):
         self.db = session
 
-    def get_all_contacts(self):
-        """
-        Return list containing all contacts
-        """
-
-        contacts = self.db.query(Contact).order_by(Contact._created_on.desc()).all()
-
-        return contacts
-
-    def get_contact(self, id):
-        """
-        Get a single contact
-        """
-
-        contact = self.db.query(Contact).get(id)
-        if contact is None:
-            raise HTTPNotFound
-
-        return contact
-
-    def create_new_contact(self, contact):
+    def create_new_contact(self, input):
         """
         Create a new contact
         """
@@ -41,24 +21,68 @@ class ContactInterface:
         new_contact = Contact()
         self.db.add(new_contact)
 
-        new_contact.dict = contact
+        try:
+            if "given_name" in input:
+                new_contact.given_name = input["given_name"]
+
+            if "family_name" in input:
+                new_contact.family_name = input["family_name"]
+
+            if "other_names" in input:
+                new_contact.other_names = input["other_names"]
+
+            if "first_language" in input:
+                new_contact.first_language = input["first_language"]
+
+            if "pronouns" in input:
+                new_contact.pronouns = input["pronouns"]
+
+            if "date_of_birth" in input:
+                new_contact.date_of_birth = datetime(
+                    input["date_of_birth"][0],
+                    input["date_of_birth"][1],
+                    input["date_of_birth"][2],
+                )
+        except:
+            raise HTTPBadRequest
 
         self.db.commit()
 
         return new_contact
 
-    def update_contact(self, id, fields):
+    def update_contact(self, id, input):
         """
         Perform a partial update on a contact
         """
 
-        fields = fields.dict(exclude_unset=True)
-
-        contact = self.db.query(Contact).get(id)
+        contact: Contact = self.db.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound
 
-        contact.dict = fields
+        try:
+            if "given_name" in input:
+                contact.given_name = input["given_name"]
+
+            if "family_name" in input:
+                contact.family_name = input["family_name"]
+
+            if "other_names" in input:
+                contact.other_names = input["other_names"]
+
+            if "first_language" in input:
+                contact.first_language = input["first_language"]
+
+            if "pronouns" in input:
+                contact.pronouns = input["pronouns"]
+
+            if "date_of_birth" in input:
+                contact.date_of_birth = datetime(
+                    input["date_of_birth"][0],
+                    input["date_of_birth"][1],
+                    input["date_of_birth"][2],
+                )
+        except:
+            raise HTTPBadRequest
 
         self.db.commit()
 

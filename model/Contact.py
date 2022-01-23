@@ -55,7 +55,14 @@ class Contact(Model):
 
     @property
     def name(self):
-        return self.given_name.capitalize() + " " + self.family_name.capitalize()
+        name = ""
+        if self.given_name is not None:
+            name += self.given_name.capitalize()
+
+        if self.family_name is not None:
+            name += f" {self.family_name.capitalize()}"
+
+        return name
 
     @property
     def legal_name(self):
@@ -63,77 +70,6 @@ class Contact(Model):
         if self.other_names is not None:
             name += " " + self.other_names.capitalize()
         return name
-
-    @property
-    def dict(self):
-        fs = FileService()
-        avatar_url = None
-        if self.avatar is not None:
-            try:
-                avatar_url = fs.get_public_url(self.avatar)
-            except:
-                pass
-
-        status = None
-        obj = {
-            "id": self.id,
-            "name": self.name,
-            "legal_name": self.legal_name,
-            "email": self.prefered_email,
-            "membership_number": self.membership_number,
-            "status": status,
-            "avatar_url": avatar_url,
-        }
-        return obj
-
-    @property
-    def dict_ext(self):
-        fs = FileService()
-
-        status = None
-        avatar_url = None
-        if self.avatar is not None:
-            try:
-                avatar_url = fs.get_public_url(self.avatar)
-            except:
-                pass
-
-        obj = {
-            "id": self.id,
-            "name": self.name,
-            "legal_name": self.legal_name,
-            "date_of_birth": self.date_of_birth.isoformat()
-            if self.date_of_birth is not None
-            else None,
-            "joined_on": self.joined_on.isoformat()
-            if self.joined_on is not None
-            else None,
-            "avatar_url": avatar_url,
-            "membership_type": self.membership_type,
-            "account_blocked": self.account_blocked,
-            "email": self.prefered_email,
-            "telephone": self.prefered_phone,
-            "membership_number": self.membership_number,
-            "status": status,
-            "created": self._created_on.isoformat()
-            if self._created_on is not None
-            else None,
-            "updated": self._updated_on.isoformat()
-            if self._updated_on is not None
-            else None,
-        }
-        return obj
-
-    @dict.setter
-    def dict(self, values: Dict):
-        for key, val in values.items():
-            if val is None:
-                continue
-            if hasattr(self, key):
-                try:
-                    setattr(self, key, val)
-                except:
-                    pass
 
 
 class EmailAddress(Model):
