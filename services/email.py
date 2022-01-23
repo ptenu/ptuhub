@@ -1,11 +1,13 @@
-import boto3
-import falcon
-import settings
-from model.Email import EmailMessage, EmailRecipient
-from model.Contact import Contact
-from model.Organisation import Branch, Committee
+import secrets
 
+import argon2
+import boto3
+import settings
 from model import Session as db
+from model.Contact import Contact, EmailAddress, VerifyToken
+from model.Email import EmailMessage, EmailRecipient
+from model.Organisation import Branch, Committee
+from falcon.errors import HTTPNotFound, HTTPBadRequest
 
 ses = boto3.client(
     "sesv2",
@@ -34,7 +36,7 @@ class EmailService:
 
         email_config = {
             "FromEmailAddress": f"{sender} <{self.FROM_EMAIL}>",
-            "Destination": {"ToAddresses": [to]},
+            "Destination": {"ToAddresses": (to,)},
             "Content": {
                 "Simple": {
                     "Subject": {"Data": subject, "Charset": self.CHARSET},
@@ -73,3 +75,47 @@ class EmailService:
                 contacts.extend(committee.members)
 
         return contacts
+
+    def send_verification(self, address: str):
+        """
+        Send a verification code to an email address
+        """
+
+        code = secrets.randbits(24)
+        message = f"[Peterborough Tenants Union]\nYour email verification code is: \n{str(code)}"
+        html_message = f"""
+        <p><strong>Peterborough Tenants Union</strong></p>
+        <p>Your email verification code is:</p>
+        <h3>{str(code)}</p>
+        <p>To verify your email address, enter this code into the website when prompted. This
+        code will be valid for 15 minutes.</p>
+        """
+
+        token = VerifyToken()
+        token.id = address.upper()
+        token.type = VerifyToken.Types.EMAIL
+        token.hash = argon2.hash_password(bytes(code))
+        self.db.add(token)
+        self.db.commit()
+
+        self.send(address, "Email address verification code", message, html_message)
+
+    def validate(self, email: str, code: int):
+        """
+        Verify an email
+        """
+
+        token = self.db.query(VerifyToken).get(VerifyToken.Types.EMAIL, email)
+        if token is None:
+            raise HTTPNotFound
+
+        if not argon2.verify_password(token.hash, bytes(code)):
+            raise HTTPBadRequest(description="Invalid code")
+
+        email = self.db.query(EmailAddress).get(email)
+        if email is None:
+            raise HTTPNotFound
+
+        email.verified = True
+        self.db.delete(token)
+        self.db.commit()

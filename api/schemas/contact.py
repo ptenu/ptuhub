@@ -1,5 +1,6 @@
 from datetime import datetime
-from model.Contact import Contact
+from model.Contact import Contact, ContactAddress, EmailAddress, TelephoneNumber
+from api.schemas.address import AddressSchema
 
 
 def dateOr(value: datetime, default):
@@ -40,8 +41,16 @@ class ContactSchema:
             "created": dateOr(self.contact._created_on, None),
             "updated": dateOr(self.contact._updated_on, None),
             "account_blocked": self.contact.account_blocked,
-            "email": self.contact.prefered_email,
             "telephone": self.contact.prefered_phone,
+            "addresses": list(
+                map(self.__map_addresses, self.contact.address_relations)
+            ),
+            "email_addresses": list(
+                map(self.__map_emails, self.contact.email_addresses)
+            ),
+            "telephone_numbers": list(
+                map(self.__map_telephone, self.contact.phone_numbers)
+            ),
         }
 
         if self.contact.avatar is not None:
@@ -52,3 +61,27 @@ class ContactSchema:
     @staticmethod
     def map_simple(contact: Contact):
         return ContactSchema(contact).simple
+
+    def __map_addresses(self, ca: ContactAddress):
+        output = {"mail_to": ca.mail_to, "active": ca.active}
+
+        if ca.custom_address is not None:
+            output["address"] = ca.custom_address
+
+        if ca.uprn is not None:
+            output["address"] = AddressSchema(ca.address).simple
+
+        return output
+
+    def __map_emails(self, email: EmailAddress):
+        return {
+            "address": email.address,
+            "prefered": self.contact.prefered_email == email.address,
+        }
+
+    def __map_telephone(self, tel: TelephoneNumber):
+        return {
+            "number": tel.number,
+            "prefered": self.contact.prefered_phone == tel.number,
+            "description": tel.description,
+        }

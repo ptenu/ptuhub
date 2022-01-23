@@ -27,6 +27,10 @@ class Routes:
         app.add_route("/contacts", contacts.ContactsResource(), suffix="collection")
         app.add_route("/contacts/{id}", contacts.ContactsResource(), suffix="single")
         app.add_route("/contacts/{id}/avatar", contacts.AvatarResource())
+        app.add_route(
+            "/contacts/{id}/email", contacts.ContactsResource(), suffix="email"
+        )
+        app.add_route("/contacts/{id}/phone", contacts.ContactsResource(), suffix="sms")
 
         # Address
         app.add_route("/address/{uprn}", address.AddressResource())

@@ -109,10 +109,28 @@ class EmailAddress(Model):
             + str(self.contact.given_name).capitalize()
         )
 
+        return f"{name} <{self.address.lower()}>"
+
 
 class TelephoneNumber(Model):
 
     __tablename__ = "contact_numbers"
+
+    # [0] Prefix, [1] Description, [3] Allowed, [4] SMS-able
+    CODES = [
+        ("01", "Standard Geographic", True, False),
+        ("02", "Standard Geographic", True, False),
+        ("03", "Standard Non-Geographic", True, False),
+        ("04", "Reserved", False, False),
+        ("05", "Freephone / VOIP", False, False),
+        ("06", "Alternative PNS", False, False),
+        ("070", "PNS", False, False),
+        ("076", "Non-inclusive mobile", False, True),
+        ("07", "Mobile", True, True),
+        ("080", "Toll Free National", True, False),
+        ("084", "Special Service", False, False),
+        ("087", "Special Service", False, False),
+    ]
 
     # Main
     number = Column(String(15), primary_key=True)
@@ -124,6 +142,18 @@ class TelephoneNumber(Model):
 
     # Relationships
     contact = relationship(Contact, backref="phone_numbers", foreign_keys=[contact_id])
+
+    def __init__(self, number: str) -> None:
+        if number.startswith("+44"):
+            number = f"0{number[3:]}"
+        number = number.replace(" ", "")
+        self.number = number
+
+    @property
+    def description(self):
+        for code in self.CODES:
+            if self.number.startswith(code[0]):
+                return code[1]
 
 
 class ContactAddress(Model):

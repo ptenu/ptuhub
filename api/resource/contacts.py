@@ -7,7 +7,9 @@ from api.interface.contacts import ContactInterface
 from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPNotFound
 from api.schemas.contact import ContactSchema
-from model.Contact import Contact
+from model.Contact import Contact, EmailAddress, TelephoneNumber
+from services.email import EmailService
+from services.sms import SmsService
 
 
 class ContactsResource:
@@ -71,6 +73,86 @@ class ContactsResource:
         contacts_interface = ContactInterface(self.session)
         contacts_interface.delete_contact(id)
         resp.status = HTTP_204
+
+    @falcon.before(auth.EnforceRoles, ["officer"])
+    def on_post_email(self, req, resp, id):
+        """
+        Create or update a contact email address
+        """
+
+        body = req.get_media()
+        needs_verification = False
+
+        contact: Contact = self.session.query(Contact).get(id)
+        if contact is None:
+            raise HTTPNotFound(description="Contact not found")
+
+        if "address" not in body:
+            raise HTTPBadRequest(description="You must include an address field.")
+
+        email = self.session.query(EmailAddress).get(body["address"])
+        if email is None:
+            needs_verification = True
+
+            email = EmailAddress(contact, body["address"])
+            if contact.id != req.context.user.id:
+                needs_verification = False
+                email.verified = True
+            else:
+                EmailService().send_verification(email.address)
+
+            self.session.add(email)
+
+        if "prefered" in body:
+            if body["prefered"] not in (True, False):
+                raise HTTPBadRequest(description="prefered must be true or false")
+
+            contact.email = email
+
+        self.session.commit()
+
+        resp.text = json.dumps({"verification": needs_verification})
+
+    @falcon.before(auth.EnforceRoles, ["officer"])
+    def on_post_sms(self, req, resp, id):
+        """
+        Create or update a contact telephone number
+        """
+
+        body = req.get_media()
+        needs_verification = False
+
+        contact: Contact = self.session.query(Contact).get(id)
+        if contact is None:
+            raise HTTPNotFound(description="Contact not found")
+
+        if "number" not in body:
+            raise HTTPBadRequest(description="You must include a number field.")
+
+        number = self.session.query(TelephoneNumber).get(body["number"])
+        if number is None:
+            needs_verification = True
+
+            number = TelephoneNumber(body["number"])
+            number.contact = contact
+
+            if contact.id != req.context.user.id or not number.number.startswith("07"):
+                number.verified = True
+                needs_verification = False
+            else:
+                SmsService(self.session).send_verification(number.number)
+
+            self.session.add(number)
+
+        if "prefered" in body:
+            if body["prefered"] not in (True, False):
+                raise HTTPBadRequest(description="prefered must be true or false")
+
+            contact.telephone = number
+
+        self.session.commit()
+
+        resp.text = json.dumps({"verification": needs_verification})
 
 
 class AvatarResource:
