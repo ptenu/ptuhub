@@ -2,6 +2,7 @@ import api.resource.root as root
 import api.resource.contacts as contacts
 import api.resource.login as login
 import api.resource.content as content
+import api.resource.address as address
 
 
 class Routes:
@@ -26,6 +27,23 @@ class Routes:
         app.add_route("/contacts", contacts.ContactsResource(), suffix="collection")
         app.add_route("/contacts/{id}", contacts.ContactsResource(), suffix="single")
         app.add_route("/contacts/{id}/avatar", contacts.AvatarResource())
+
+        # Address
+        app.add_route("/address/{uprn}", address.AddressResource())
+        app.add_route(
+            "/address/{uprn}/notes", address.AddressResource(), suffix="notes"
+        )
+        app.add_route(
+            "/address/{uprn}/notes/{id}", address.AddressResource(), suffix="note"
+        )
+        app.add_route(
+            "/address/{uprn}/returns", address.AddressResource(), suffix="returns"
+        )
+        app.add_route(
+            "/postcode/{outcode}/{incode}", address.AddressResource(), suffix="postcode"
+        )
+        app.add_route("/postcode/{outcode}", address.AddressResource(), suffix="street")
+        app.add_route("/street/{usrn}", address.StreetResource())
 
         # Content
         app.add_route("/pages", content.PublicPageResource(), suffix="all")

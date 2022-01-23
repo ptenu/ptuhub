@@ -316,12 +316,11 @@ class Postcode(Model):
 
         c_type = codes[self.i]
         self.i += 1
-        if hasattr(self, c_type):
-            c_full = getattr(self, c_type)
-        else:
+        code = getattr(self, c_type)
+        if code is None:
             return None
 
-        bdry = db.query(Boundary).get(c_full)
+        bdry = db.query(Boundary).get(code)
         return bdry
 
 
@@ -344,6 +343,13 @@ class AddressNote(Model):
 class SurveyReturn(Model):
     __tablename__ = "survey_returns"
 
+    QUESTIONS = {
+        "tenure": "tenure",
+        "response_2": "unused_1",
+        "response_3": "unused_2",
+        "response_4": "unused_3",
+    }
+
     class TenureTypes(Enum):
         PRIVATE_RENT = "P"
         SOCIAL_RENT = "S"
@@ -357,7 +363,9 @@ class SurveyReturn(Model):
     date = Column(Date)
     contact_id = Column(Integer, ForeignKey("contacts.id", ondelete="SET NULL"))
     tenure = Column(EnumColumn(TenureTypes, name="survey_tenure_types"), nullable=True)
-    housing_cost = Column(Integer, nullable=True)
+    response_2 = Column(String(1), nullable=True)
+    response_3 = Column(String(1), nullable=True)
+    response_4 = Column(String(1), nullable=True)
     answered = Column(Boolean, nullable=False, default=True)
 
     address = relationship("Address", backref="survey_returns")

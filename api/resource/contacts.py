@@ -1,13 +1,11 @@
+import json
 import tempfile
-from typing import List, Optional
-
-from falcon.errors import HTTPBadRequest
 
 import api.middleware.authentication as auth
 import falcon
 from api.interface.contacts import ContactInterface
-from falcon import HTTP_201, HTTP_204, HTTP_200
-import json
+from falcon import HTTP_200, HTTP_201, HTTP_204
+from falcon.errors import HTTPBadRequest
 
 
 class ContactsResource:
