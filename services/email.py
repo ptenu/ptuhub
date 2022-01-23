@@ -86,7 +86,7 @@ class EmailService:
         html_message = f"""
         <p><strong>Peterborough Tenants Union</strong></p>
         <p>Your email verification code is:</p>
-        <h3>{str(code)}</p>
+        <h3>{str(code)}</h3>
         <p>To verify your email address, enter this code into the website when prompted. This
         code will be valid for 15 minutes.</p>
         """

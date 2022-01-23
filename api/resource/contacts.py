@@ -99,7 +99,9 @@ class ContactsResource:
                 needs_verification = False
                 email.verified = True
             else:
-                EmailService().send_verification(email.address)
+                es = EmailService()
+                es.db = self.session
+                es.send_verification(email.address)
 
             self.session.add(email)
 
