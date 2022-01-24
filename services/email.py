@@ -1,6 +1,6 @@
 import secrets
 
-import argon2
+from passlib.hash import argon2
 import boto3
 import settings
 from model import Session as db
@@ -91,11 +91,15 @@ class EmailService:
         code will be valid for 15 minutes.</p>
         """
 
-        token = VerifyToken()
-        token.id = address.upper()
-        token.type = VerifyToken.Types.EMAIL
-        token.hash = argon2.hash_password(bytes(code))
-        self.db.add(token)
+        token = self.db.query(VerifyToken).get([VerifyToken.Types.EMAIL, address])
+        if token is None:
+            token = VerifyToken()
+            token.id = address.upper()
+            token.type = VerifyToken.Types.EMAIL
+            self.db.add(token)
+
+        token.hash = argon2.hash(str(code))
+
         self.db.commit()
 
         self.send(address, "Email address verification code", message, html_message)
@@ -105,11 +109,11 @@ class EmailService:
         Verify an email
         """
 
-        token = self.db.query(VerifyToken).get(VerifyToken.Types.EMAIL, email)
+        token = self.db.query(VerifyToken).get([VerifyToken.Types.EMAIL, email])
         if token is None:
             raise HTTPNotFound
 
-        if not argon2.verify_password(token.hash, bytes(code)):
+        if not argon2.verify(code, token.hash):
             raise HTTPBadRequest(description="Invalid code")
 
         email = self.db.query(EmailAddress).get(email)

@@ -1,17 +1,15 @@
 import secrets
 
-import argon2
-import boto3
+from passlib.hash import argon2
+from twilio.rest import Client
 import settings
 from falcon.errors import HTTPNotFound, HTTPBadRequest
 from model.Contact import Contact, TelephoneNumber, VerifyToken
 from sqlalchemy.orm import Session
 
-sns = boto3.client(
-    "sns",
-    aws_access_key_id=settings.config["aws"].get("access_key"),
-    aws_secret_access_key=settings.config["aws"].get("secret"),
-    region_name="eu-west-1",
+client = Client(
+    settings.config["twilio"].get("account_sid"),
+    settings.config["twilio"].get("auth_token"),
 )
 
 
@@ -41,7 +39,11 @@ class SmsService:
 
         phone_number = f"+44{phone_number[1:]}"
 
-        response = sns.publish(PhoneNumber=phone_number, Message=message)
+        response = client.messages.create(
+            messaging_service_sid="MGa23d6bba04c304656f9d4e7b4aa7befa",
+            to=phone_number,
+            body=message,
+        )
 
         return response
 
@@ -50,30 +52,38 @@ class SmsService:
         Send a verification text to a single number
         """
         code = secrets.randbits(16)
-        message = f"[Peterborough Tenants Union]\nYour phone number verification code is: \n{str(code)}"
+        message = f"Your phone number verification code is: \n{str(code)}"
 
-        token = VerifyToken()
+        token = self.db.query(VerifyToken).get([VerifyToken.Types.PHONE, number])
+        if token is None:
+            token = VerifyToken()
+            self.db.add(token)
+
         token.id = number
         token.type = VerifyToken.Types.PHONE
-        token.hash = argon2.hash_password(bytes(code))
-        self.db.add(token)
+        token.hash = argon2.hash(str(code))
+
         self.db.commit()
 
         if not number.startswith("+44"):
             number = f"+44{number[1:]}"
 
-        return sns.publish(PhoneNumber=number, Message=message)
+        return client.messages.create(
+            messaging_service_sid="MGa23d6bba04c304656f9d4e7b4aa7befa",
+            to=number,
+            body=message,
+        )
 
-    def validate(self, number: str, code: int):
+    def validate(self, number: str, code):
         """
         Verify a number
         """
 
-        token = self.db.query(VerifyToken).get(VerifyToken.Types.PHONE, number)
+        token = self.db.query(VerifyToken).get([VerifyToken.Types.PHONE, number])
         if token is None:
             raise HTTPNotFound
 
-        if not argon2.verify_password(token.hash, bytes(code)):
+        if not argon2.verify(code, token.hash):
             raise HTTPBadRequest(description="Invalid code")
 
         tel = self.db.query(TelephoneNumber).get(number)

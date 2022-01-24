@@ -31,6 +31,15 @@ class Routes:
             "/contacts/{id}/email", contacts.ContactsResource(), suffix="email"
         )
         app.add_route("/contacts/{id}/phone", contacts.ContactsResource(), suffix="sms")
+        app.add_route(
+            "/contacts/{id}/email/{address}",
+            contacts.ContactsResource(),
+            suffix="email",
+        )
+        app.add_route(
+            "/contacts/{id}/phone/{number}", contacts.ContactsResource(), suffix="sms"
+        )
+        app.add_route("/verify", contacts.ContactsResource(), suffix="verify")
 
         # Address
         app.add_route("/address/{uprn}", address.AddressResource())

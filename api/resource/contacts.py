@@ -90,7 +90,7 @@ class ContactsResource:
         if "address" not in body:
             raise HTTPBadRequest(description="You must include an address field.")
 
-        email = self.session.query(EmailAddress).get(body["address"])
+        email = self.session.query(EmailAddress).get(str(body["address"]).upper())
         if email is None:
             needs_verification = True
 
@@ -109,7 +109,10 @@ class ContactsResource:
             if body["prefered"] not in (True, False):
                 raise HTTPBadRequest(description="prefered must be true or false")
 
-            contact.email = email
+            if body["prefered"] == True:
+                contact.email = email
+            elif contact.email.address == email.address:
+                contact.email = None
 
         self.session.commit()
 
@@ -150,11 +153,65 @@ class ContactsResource:
             if body["prefered"] not in (True, False):
                 raise HTTPBadRequest(description="prefered must be true or false")
 
-            contact.telephone = number
+            if body["prefered"] == True:
+                contact.telephone = number
+            elif contact.telephone.number == number.number:
+                contact.telephone = None
 
         self.session.commit()
 
         resp.text = json.dumps({"verification": needs_verification})
+
+    def on_put_verify(self, req, resp):
+        """
+        Confirm a verification code for email or telephone no.
+        """
+
+        body = req.get_media()
+        if "address" not in body and "number" not in body:
+            raise HTTPBadRequest
+
+        if "code" not in body:
+            raise HTTPBadRequest
+
+        if "address" in body:
+            es = EmailService()
+            es.db = self.session
+            es.validate(body["address"], body["code"])
+
+        if "number" in body:
+            es = SmsService(self.session)
+            es.validate(body["number"], body["code"])
+
+        resp.status = HTTP_204
+
+    @falcon.before(auth.EnforceRoles, ["officer"])
+    def on_delete_sms(self, req, resp, id, number):
+        """
+        Delete a phone number
+        """
+
+        tel = self.session.query(TelephoneNumber).get(number)
+        if tel is None:
+            raise HTTPNotFound
+
+        self.session.delete(tel)
+        self.session.commit()
+        resp.status = HTTP_204
+
+    @falcon.before(auth.EnforceRoles, ["officer"])
+    def on_delete_email(self, req, resp, id, address):
+        """
+        Delete an email
+        """
+
+        email = self.session.query(EmailAddress).get(address.upper())
+        if email is None:
+            raise HTTPNotFound
+
+        self.session.delete(email)
+        self.session.commit()
+        resp.status = HTTP_204
 
 
 class AvatarResource:

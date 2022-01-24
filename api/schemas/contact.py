@@ -41,7 +41,6 @@ class ContactSchema:
             "created": dateOr(self.contact._created_on, None),
             "updated": dateOr(self.contact._updated_on, None),
             "account_blocked": self.contact.account_blocked,
-            "telephone": self.contact.prefered_phone,
             "addresses": list(
                 map(self.__map_addresses, self.contact.address_relations)
             ),
@@ -75,7 +74,7 @@ class ContactSchema:
 
     def __map_emails(self, email: EmailAddress):
         return {
-            "address": email.address,
+            "address": email.address.lower(),
             "prefered": self.contact.prefered_email == email.address,
         }
 
