@@ -3,6 +3,7 @@ import json
 
 from api.middleware.authentication import EnforceRoles
 import falcon
+from sqlalchemy.sql.expression import func
 from falcon.errors import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
 from model.Address import Address, AddressNote, Postcode, Street, SurveyReturn
 from model.Contact import Contact
@@ -20,6 +21,38 @@ class AddressResource:
 
         schema = AddressSchema(addr)
         resp.text = json.dumps(schema.extended)
+
+    def on_get_near(self, req, resp, lat, lng):
+        """
+        Return nearby addresses
+        """
+
+        if req.context.user is None:
+            raise HTTPUnauthorized
+
+        lat = float(lat)
+        lng = float(lng)
+        position = (lat, lng)
+
+        bounds = ((lat - 0.0003, lat + 0.0003), (lng - 0.0003, lng + 0.0003))
+
+        def distance(latlong1, latlong2):
+            return func.sqrt(
+                func.pow(latlong1[0] - latlong2[0], 2)
+                + func.pow(latlong1[1] - latlong2[1], 2)
+            )
+
+        addrs = (
+            self.session.query(Address)
+            .filter(Address.latitude.between(bounds[0][0], bounds[0][1]))
+            .filter(Address.longitude.between(bounds[1][0], bounds[1][1]))
+            .order_by(distance(position, (Address.latitude, Address.longitude)))
+            .limit(10)
+        )
+
+        result = list(map(AddressSchema.map_with_contact, addrs))
+
+        resp.text = json.dumps(result)
 
     @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
     def on_get_notes(self, req, resp, uprn):
@@ -173,11 +206,13 @@ class AddressResource:
         result = AddressSchema(addr).returns
         resp.text = json.dumps(result)
 
-    @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
     def on_put_returns(self, req, resp, uprn):
         """
         Add a new return
         """
+
+        if req.context.user is None:
+            raise HTTPUnauthorized
 
         addr = self.session.query(Address).get(uprn)
 

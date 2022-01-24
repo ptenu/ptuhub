@@ -1,5 +1,8 @@
 from model.Address import Address, AddressNote, Boundary, Postcode, Street, SurveyReturn
 from model.Contact import ContactAddress
+from sqlalchemy.sql.expression import func
+
+from model import Session
 
 
 class StreetSchema:
@@ -41,9 +44,28 @@ class AddressSchema:
             "classification": list(self.address.classification),
         }
 
+    @property
+    def simple_with_last_contact(self):
+        last_return = (
+            Session.query(SurveyReturn)
+            .filter(SurveyReturn.uprn == self.address.uprn)
+            .order_by(SurveyReturn.date.desc())
+            .first()
+        )
+        return {
+            "uprn": self.address.uprn,
+            "address": str(self.address),
+            "classification": list(self.address.classification),
+            "last_contact": self.__map_returns(last_return),
+        }
+
     @staticmethod
     def map_simple(address: Address):
         return AddressSchema(address).simple
+
+    @staticmethod
+    def map_with_contact(address: Address):
+        return AddressSchema(address).simple_with_last_contact
 
     @property
     def extended(self):
@@ -70,6 +92,8 @@ class AddressSchema:
         return list(map(self.__map_returns, self.address.survey_returns))
 
     def __map_returns(self, response: SurveyReturn):
+        if response is None:
+            return None
         rs = {}
         if response.tenure is not None:
             rs[response.QUESTIONS["tenure"]] = response.tenure.name

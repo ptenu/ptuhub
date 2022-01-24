@@ -44,6 +44,9 @@ class Routes:
         # Address
         app.add_route("/address/{uprn}", address.AddressResource())
         app.add_route(
+            "/address/near/{lat}/{lng}", address.AddressResource(), suffix="near"
+        )
+        app.add_route(
             "/address/{uprn}/notes", address.AddressResource(), suffix="notes"
         )
         app.add_route(
