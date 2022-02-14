@@ -2,7 +2,7 @@ from model.Address import Address, AddressNote, Boundary, Postcode, Street, Surv
 from model.Contact import ContactAddress
 from sqlalchemy.sql.expression import func
 
-from model import Session
+from model import db
 
 
 class StreetSchema:
@@ -47,7 +47,7 @@ class AddressSchema:
     @property
     def simple_with_last_contact(self):
         last_return = (
-            Session.query(SurveyReturn)
+            db.query(SurveyReturn)
             .filter(SurveyReturn.uprn == self.address.uprn)
             .order_by(SurveyReturn.date.desc())
             .first()

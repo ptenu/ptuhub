@@ -1,5 +1,5 @@
 from os import name
-from model import Session as db
+from model import db
 from model.Contact import Contact, EmailAddress
 from passlib.hash import argon2
 

@@ -3,7 +3,7 @@ Register all middleware in this array:
 """
 
 import api.middleware.database as database
-import api.middleware.authentication as auth
-from model import Session
+import api.middleware.session as auth
+from model import db
 
-MIDDLEWARE = [database.SQLAlchemySessionManager(Session), auth.UserAuthManager(Session)]
+MIDDLEWARE = [database.SQLAlchemySessionManager(db), auth.SessionManager()]

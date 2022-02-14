@@ -3,6 +3,7 @@ argon2-cffi==21.1.0
 asgiref==3.4.1
 attrs==21.2.0
 black==21.9b0
+blake3==0.3.1
 boto3==1.18.59
 botocore==1.21.59
 certifi==2021.10.8
@@ -17,6 +18,7 @@ falcon==3.0.1
 greenlet==1.1.2
 gunicorn==20.1.0
 h11==0.12.0
+hashids==1.3.1
 idna==3.3
 importlib-metadata==4.8.1
 importlib-resources==5.2.2

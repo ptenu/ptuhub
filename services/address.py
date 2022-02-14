@@ -4,7 +4,7 @@ import zipfile
 import click
 
 import pandas as pd
-from model import Session as db
+from model import db
 from model.Address import Address, Classification, Street, Postcode, Boundary
 
 from services.files import FileService

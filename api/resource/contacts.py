@@ -7,7 +7,8 @@ from api.interface.contacts import ContactInterface
 from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPNotFound
 from api.schemas.contact import ContactSchema
-from model.Contact import Contact, EmailAddress, TelephoneNumber
+from model.Contact import Contact, ContactAddress, EmailAddress, TelephoneNumber
+from model.Address import Address
 from services.email import EmailService
 from services.sms import SmsService
 
@@ -247,3 +248,105 @@ class AvatarResource:
         ci.clear_avatar(id)
 
         resp.status = HTTP_204
+
+
+class AddressResource:
+    @falcon.before(auth.EnforceRoles, ["officer", "rep", "organiser"])
+    def on_put(self, req, resp, id):
+        """
+        Associate an address with a contact
+        """
+
+        body = req.get_media()
+
+        if "uprn" not in body and "address" not in body:
+            raise HTTPBadRequest(
+                description="You must include EITHER a custom address string, or an address UPRN."
+            )
+
+        resp.status = HTTP_204
+
+        contact = self.session.query(Contact).get(id)
+        if contact is None:
+            raise HTTPNotFound
+
+        ca = self.__get_contact_address(contact, body)
+        if ca is None:
+            ca = ContactAddress()
+            ca.contact = contact
+            self.session.add(ca)
+            resp.status = HTTP_201
+
+        if "uprn" in body:
+            address: Address = self.session.query(Address).get(body["uprn"])
+            if address is None:
+                raise HTTPNotFound
+
+            ca.uprn = address
+
+        elif "address" in body:
+            ca.custom_address = body["address"]
+
+        if "tenure" not in body:
+            raise HTTPBadRequest(description="You must include a tenure type.")
+
+        try:
+            tenure = str(body["tenure"]).upper()
+            tenure_type = ContactAddress.Tenure[tenure]
+            ca.tenure = tenure_type
+
+        except KeyError:
+            raise HTTPBadRequest(description="Tenure must be an allowed type.")
+
+        ca.active = True
+
+        if "mail_to" in body:
+            ca.mail_to = body["mail_to"]
+
+        self.session.commit()
+
+    def on_delete(self, req, resp, id):
+        """
+        Set an address to inactive
+        """
+
+        body = req.get_media()
+        contact = self.session.query(Contact).get(id)
+        if contact is None:
+            raise HTTPNotFound
+
+        if "uprn" not in body and "address" not in body:
+            raise HTTPBadRequest(
+                description="You must include EITHER a custom address string, or an address UPRN."
+            )
+
+        ca = self.__get_contact_address(contact, body)
+        if ca is None:
+            raise HTTPNotFound
+
+        ca.active = False
+
+        self.session.commit()
+
+        resp.status = HTTP_204
+
+    def __get_contact_address(self, contact: Contact, body) -> ContactAddress:
+        address = None
+
+        if "uprn" in body:
+            address: ContactAddress = (
+                self.session.query(ContactAddress)
+                .filter(ContactAddress.contact_id == contact.id)
+                .filter(ContactAddress.uprn == body["uprn"])
+                .first()
+            )
+
+        elif "address" in body:
+            address: ContactAddress = (
+                self.session.query(ContactAddress)
+                .filter(ContactAddress.contact_id == contact.id)
+                .filter(ContactAddress.custom_address == body["address"])
+                .first()
+            )
+
+        return address

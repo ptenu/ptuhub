@@ -15,7 +15,7 @@ from enum import Enum
 
 from sqlalchemy.sql.schema import Table
 
-from model import Model, Session as db
+from model import Model, db
 
 
 case_files = Table(

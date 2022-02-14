@@ -1,10 +1,11 @@
 from datetime import datetime
+
 from falcon.errors import HTTPNotFound
-from sqlalchemy.sql.sqltypes import Boolean
-from model import Session
+from model import db as Session
 from model.Content import Page
 from model.File import File
 from slugify import slugify
+from sqlalchemy.sql.sqltypes import Boolean
 
 
 class ContentInterface:

@@ -3,13 +3,14 @@ from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict
 
+from services.files import FileService
 from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
-from sqlalchemy import ForeignKey, Integer, String, Text
+from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
+from sqlalchemy.sql.expression import func
 
 from model import Model
-from services.files import FileService
 
 
 class Contact(Model):
@@ -264,3 +265,29 @@ class Role(Model):
     name = Column(String(20), primary_key=True)
 
     contact = relationship(Contact, backref="roles")
+
+
+class Availability(Model):
+    __tablename__ = "contact_availability"
+
+    class AvailabilityStatuses(Enum):
+        AVAILABLE = 1
+        OFFLINE = 0
+        EMAR = 999  # EMergency Assistance Req.
+        ASSIGNED = 2
+        BUSY = 3
+        ON_BREAK = 4
+
+    AVS = AvailabilityStatuses
+
+    contact_id = Column(
+        Integer,
+        ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE"),
+        primary_key=True,
+    )
+    timestamp = Column(DateTime, default=func.now(), primary_key=True)
+    status = Column(EnumColumn(AvailabilityStatuses), nullable=False)
+    latitude = Column(Float(precision=8, decimal_return_scale=7), nullable=True)
+    longitude = Column(Float(precision=8, decimal_return_scale=7), nullable=True)
+
+    contact = relationship(Contact, backref="statuses")

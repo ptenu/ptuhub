@@ -3,6 +3,7 @@ import api.resource.contacts as contacts
 import api.resource.login as login
 import api.resource.content as content
 import api.resource.address as address
+import api.resource.session as session
 
 
 class Routes:
@@ -15,12 +16,11 @@ class Routes:
         app.add_route("/", root.RootResource())
 
         # Auth
-        app.add_route("/token", login.TokenResource(), suffix="token")
+        app.add_route("/session", session.SessionResource())
         app.add_route("/password", login.PasswordResource(), suffix="self")
         app.add_route(
             "/password/{contact_id}", login.PasswordResource(), suffix="contact"
         )
-        app.add_route("/refresh", login.TokenResource(), suffix="refresh")
         app.add_route("/.well-known/jwpub.pem", login.TokenResource(), suffix="pk")
 
         # Contacts
@@ -40,6 +40,7 @@ class Routes:
             "/contacts/{id}/phone/{number}", contacts.ContactsResource(), suffix="sms"
         )
         app.add_route("/verify", contacts.ContactsResource(), suffix="verify")
+        app.add_route("/contact/{id}/address", contacts.AddressResource())
 
         # Address
         app.add_route("/address/{uprn}", address.AddressResource())

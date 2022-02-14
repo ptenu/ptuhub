@@ -3,7 +3,7 @@ import secrets
 from passlib.hash import argon2
 import boto3
 import settings
-from model import Session as db
+from model import db
 from model.Contact import Contact, EmailAddress, VerifyToken
 from model.Email import EmailMessage, EmailRecipient
 from model.Organisation import Branch, Committee

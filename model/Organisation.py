@@ -1,10 +1,25 @@
 from datetime import datetime, timedelta
+from enum import Enum
 
 from services.organisation import get_branch_members
 from sqlalchemy import Column, Date, ForeignKey, Integer, String
+from sqlalchemy import Enum as EnumColumn
 from sqlalchemy.orm import relationship
 
 from model import Model
+
+
+class RoleTypes(Enum):
+    CHAIR = "chair"
+    SEC = "secretary"
+    TRES = "treasurer"
+    TRUST = "trustee"
+    MEM = "member"
+    DEL = "delegate"
+    REP = "representative"
+    SREP = "senior representative"
+    ORG = "organiser"
+    LREP = "learning rep"
 
 
 class Branch(Model):
@@ -32,28 +47,6 @@ class BranchArea(Model):
     branch = relationship(Branch, backref="areas")
 
 
-class BranchOfficer(Model):
-
-    __tablename__ = "branch_officers"
-
-    branch_id = Column(
-        Integer,
-        ForeignKey("branches.id", ondelete="CASCADE", onupdate="CASCADE"),
-        primary_key=True,
-    )
-    contact_id = Column(
-        Integer,
-        ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE"),
-        primary_key=True,
-    )
-    role_title = Column(String(255), nullable=True)
-    held_since = Column(Date, default=datetime.now())
-    ends_on = Column(Date, default=datetime.now() + timedelta(weeks=52))
-
-    branch = relationship(Branch, backref="officers")
-    contact = relationship("Contact", backref="branches")
-
-
 class Committee(Model):
 
     __tablename__ = "committees"
@@ -63,23 +56,41 @@ class Committee(Model):
     abbreviation = Column(String(2), nullable=False, unique=True)
 
 
-class CommitteeMember(Model):
+class Roles(Model):
 
-    __tablename__ = "committee_members"
+    __tablename__ = "roles"
 
-    committee_id = Column(
+    class UnitTypes(Enum):
+        COMMITTEE = "committee"
+        BRANCH = "branch"
+
+    id = Column(Integer, primary_key=True)
+    contact_id = Column(
         Integer,
-        ForeignKey("committees.id", ondelete="CASCADE", onupdate="CASCADE"),
-        primary_key=True,
+        ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE"),
     )
+    title = Column(String, nullable=False)
+    type = Column(EnumColumn(RoleTypes), nullable=False)
     contact_id = Column(
         Integer,
         ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE"),
         primary_key=True,
     )
-    role_title = Column(String(255), nullable=False, default="member")
-    joined = Column(Date, default=datetime.now(), nullable=False)
-    left = Column(Date, default=datetime.now() + timedelta(weeks=52))
+    unit_type = Column(EnumColumn(UnitTypes), nullable=False)
+    branch_id = Column(
+        Integer,
+        ForeignKey("branches.id", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=True,
+    )
+    committee_id = Column(
+        Integer,
+        ForeignKey("committees.id", ondelete="CASCADE", onupdate="CASCADE"),
+        nullable=True,
+    )
+    role_title = Column(String(255), nullable=True)
+    held_since = Column(Date, default=datetime.now())
+    ends_on = Column(Date, default=datetime.now() + timedelta(weeks=52))
 
+    branch = relationship(Branch, backref="officers")
     committee = relationship(Committee, backref="members")
-    contact = relationship("Contact", backref="committees")
+    contact = relationship("Contact", backref="branches")

@@ -7,7 +7,7 @@ from model.Subscription import Activity, Subscription
 import settings
 import stripe
 from falcon import HTTPInternalServerError
-from model import Session as db
+from model import db
 from model.Address import Address
 from model.Contact import Contact, ContactAddress
 from operator import itemgetter

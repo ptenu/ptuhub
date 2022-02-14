@@ -8,7 +8,7 @@ URL = "{engine}://{username}:{password}@{host}:{port}/{database}".format(
 engine = create_engine(URL)
 
 session_factory = sessionmaker(bind=engine)
-Session = scoped_session(session_factory)
+db = scoped_session(session_factory)
 
 
 Model = declarative_base()

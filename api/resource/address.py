@@ -47,7 +47,7 @@ class AddressResource:
             .filter(Address.latitude.between(bounds[0][0], bounds[0][1]))
             .filter(Address.longitude.between(bounds[1][0], bounds[1][1]))
             .order_by(distance(position, (Address.latitude, Address.longitude)))
-            .limit(10)
+            .limit(50)
         )
 
         result = list(map(AddressSchema.map_with_contact, addrs))

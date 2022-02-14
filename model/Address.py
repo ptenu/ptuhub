@@ -6,7 +6,7 @@ from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
 from model import Model
-from model import Session as db
+from model import db
 
 
 class Address(Model):

@@ -6,7 +6,7 @@ import jwt
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
 from falcon.errors import HTTPForbidden, HTTPUnauthorized
-from model import Session as db
+from model import db
 from model.Contact import Contact
 from settings import config
 
@@ -98,13 +98,12 @@ class User:
     This is not persisted to the database.
     """
 
-    id: str = ""
     authenticated: bool = False
     anonymous: bool = True
     contact: Contact = None
     roles = []
 
-    def __init__(self, id: str = None, contact: Contact = None):
+    def __init__(self, contact: Contact = None):
         self.valid_for = timedelta(minutes=10)
         self.roles = []
 
@@ -116,16 +115,10 @@ class User:
             for r in contact.roles:
                 self.roles.append(r.name)
 
-        if id is not None:
-            self.id = id
-
-        else:
-            self.id = uuid.uuid4()
-
     def get_claims(self):
         exp = datetime.now() + self.valid_for
         claims = {
-            "sub": self.id,
+            "sub": self.contact.id,
             "iss": "ptu-hub-api",
             "type": "auth",
             "email": self.contact.prefered_email,
@@ -150,6 +143,20 @@ class User:
             algorithm="RS256",
         )
 
+    def get_refresh_token(self):
+        return jwt.encode(
+            {
+                "sub": self.contact.id,
+                "type": "refresh",
+                "iss": "ptu-hub-api",
+                "iat": datetime.now().timestamp(),
+                "nbf": (datetime.now() - timedelta(seconds=10)).timestamp(),
+                "exp": (datetime.now() + timedelta(days=7)).timestamp(),
+            },
+            PRIV_KEY,
+            algorithm="RS256",
+        )
+
 
 def get_contact_from_token(token: str):
     if token.startswith("Bearer"):
@@ -158,14 +165,14 @@ def get_contact_from_token(token: str):
 
     if claims["iss"] != "ptu-hub-api":
         raise HTTPUnauthorized(
-            description="There was a problem with the token provided."
+            title="Invalid token", description="Invalid authentication token"
         )
 
-    if claims["type"] != "auth":
-        return None
-
-    if claims["anon"] == True:
-        return None
+    try:
+        if claims["anon"] == True:
+            return None
+    except KeyError:
+        pass
 
     return db.query(Contact).get(claims["sub"])
 
@@ -182,18 +189,19 @@ def token_refresh(token: str):
 
     if claims["iss"] != "ptu-hub-api":
         raise HTTPUnauthorized(
-            description="There was a problem with the token provided."
+            title="Invalid token", description="Invalid refresh token"
         )
 
     if claims["type"] != "refresh":
-        return None
+        raise HTTPUnauthorized(
+            title="Invalid token", description="Invalid refresh token"
+        )
 
     person = db.query(Contact).get(claims["sub"])
     if person is None:
         raise HTTPUnauthorized(
-            description="There was a problem with the token provided."
+            title="Invalid token", description="Invalid refresh token"
         )
-
-    user = User(person.id, person)
+    user = User(person)
 
     return user.get_auth_token()

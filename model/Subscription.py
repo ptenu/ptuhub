@@ -9,7 +9,7 @@ from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import backref, relationship
 
 from model import Model
-from model import Session as db
+from model import db
 
 
 class Subscription(Model):

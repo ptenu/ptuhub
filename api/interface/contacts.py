@@ -1,7 +1,7 @@
 from datetime import datetime
 import tempfile
 from falcon.errors import HTTPBadRequest, HTTPNotFound
-from model import Session
+from model import db as Session
 from model.File import File
 from io import BytesIO
 from PIL import Image, UnidentifiedImageError
