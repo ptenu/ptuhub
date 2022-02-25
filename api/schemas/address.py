@@ -56,6 +56,7 @@ class AddressSchema:
             "uprn": self.address.uprn,
             "address": str(self.address),
             "classification": list(self.address.classification),
+            "coordinates": [self.address.latitude, self.address.longitude],
             "last_contact": self.__map_returns(last_return),
         }
 

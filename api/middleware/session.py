@@ -5,11 +5,12 @@ from falcon.errors import HTTPUnauthorized
 from jwt import ExpiredSignatureError
 from model import db
 from model.Session import Request, Session
-from services.auth import get_contact_from_token
 from settings import config
 
 SK = config.get("default", "secret")
 ENV = config.get("default", "env")
+
+NO_VALIDATION_URLS = ("/session", "/")
 
 
 class SessionManager:
@@ -53,12 +54,12 @@ class SessionManager:
         request.context object.
         """
 
-        if req.path == "/session":
+        if req.path in NO_VALIDATION_URLS:
+            req.context.user = None
             return
 
         # Get any headers we might need
         session_id = req.get_header("X-Session-Id")
-        auth_token = req.auth
         client_hash = req.get_header("X-Client-Id")
         verification_code = req.get_header("X-Verification-Code")
 
@@ -73,8 +74,10 @@ class SessionManager:
                 title="Invalid token", description="Missing client ID header"
             )
 
-        session = db.query(Session).get(session_id)
-        if session is None:
+        try:
+            session = db.query(Session).get(session_id)
+            assert session is not None
+        except:
             raise HTTPUnauthorized(
                 title="Invalid token", description="Invalid session ID"
             )
@@ -104,24 +107,10 @@ class SessionManager:
         req.context.request = request
         session.last_used = datetime.now()
 
+        req.context.user = session.user
+        request.user = session.user
+
         self.__validate_hash(session_id, client_hash, resp)
-
-        if auth_token is not None:
-            try:
-                contact = get_contact_from_token(auth_token)
-            except ExpiredSignatureError:
-                raise HTTPUnauthorized(
-                    title="Invalid token", description="Token has expired"
-                )
-
-            if session.contact_id != contact.id:
-                db.commit()
-                raise HTTPUnauthorized(
-                    title="Invalid token", description="User mismatch"
-                )
-
-            req.context.user = contact
-            request.user = contact
 
         db.commit()
 
@@ -129,6 +118,9 @@ class SessionManager:
         """
         Update the information on the request
         """
+
+        if req.method == "OPTIONS":
+            return
 
         if not hasattr(req.context, "request"):
             return
@@ -145,4 +137,5 @@ class SessionManager:
 
         client_hash = request.generate_hash()
         resp.set_header("X-Client-Id", client_hash)
+        resp.set_header("Access-Control-Expose-Headers", "X-Client-Id, X-Dev-Message")
         db.commit()

@@ -8,7 +8,6 @@ from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPForbidden, HTTPNotFound, HTTPUnauthorized
 from model.Contact import Contact
 from passlib.hash import argon2
-from services.auth import PRIV_KEY, PUB_KEY, User, token_refresh
 from settings import config
 
 
@@ -55,13 +54,3 @@ class PasswordResource:
         self.change_password(contact, new_password)
 
         resp.status = HTTP_204
-
-
-class TokenResource:
-    def on_get_pk(self, req, resp):
-        key = PUB_KEY.public_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PublicFormat.SubjectPublicKeyInfo,
-        )
-        resp.data = key
-        resp.content_type = falcon.MEDIA_TEXT

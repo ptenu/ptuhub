@@ -2,10 +2,8 @@ import falcon
 from falcon import HTTP_201, HTTP_204
 from falcon.errors import (
     HTTPBadRequest,
-    HTTPForbidden,
     HTTPNotFound,
     HTTPNotImplemented,
-    HTTPUnauthorized,
 )
 from model.Contact import Contact
 from model.Session import Session, Request
@@ -15,8 +13,6 @@ from blake3 import blake3
 from datetime import datetime
 
 SK = config.get("default", "secret")
-
-from services.auth import User, get_contact_from_token, token_refresh
 
 
 class SessionResource:
@@ -79,17 +75,6 @@ class SessionResource:
 
             session.user = contact
             session.entrust()
-            user = User(contact)
-            tokens["auth"] = user.get_auth_token()
-            tokens["refresh"] = user.get_refresh_token()
-
-        if "refresh_token" in body:
-            contact = get_contact_from_token(body["refresh_token"])
-            last_session = self._get_user_last_session(req, contact)
-            if last_session is not None:
-                session = last_session
-
-            tokens["auth"] = token_refresh(body["refresh_token"])
 
         if session.id is None:
             self.session.add(session)
@@ -110,4 +95,4 @@ class SessionResource:
             request.user = session.user
 
         self.session.commit()
-        resp.media = {"session": {"session_id": session.id}, "tokens": tokens}
+        resp.media = {"session_id": session.id}

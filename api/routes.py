@@ -21,7 +21,6 @@ class Routes:
         app.add_route(
             "/password/{contact_id}", login.PasswordResource(), suffix="contact"
         )
-        app.add_route("/.well-known/jwpub.pem", login.TokenResource(), suffix="pk")
 
         # Contacts
         app.add_route("/contacts", contacts.ContactsResource(), suffix="collection")
