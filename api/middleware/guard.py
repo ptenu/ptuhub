@@ -1,26 +1,38 @@
 from model.Contact import Contact
-from falcon.errors import HTTPUnauthorized, HTTPBadRequest, HTTPNotImplemented
+from falcon.errors import (
+    HTTPBadRequest,
+    HTTPNotImplemented,
+    HTTPForbidden,
+)
 
 
 class GuardMiddleware:
-    def validate(self, method: str, single_obj, contact: Contact = None):
+    def validate(self, method: str, single_obj, contact: Contact = None, fields=[]):
         """
         For a given object, call the appropriate method on the object and
-        return either the object, or None
+        return either the object, or False
         """
+        rv = False
+
         if not hasattr(single_obj, method):
             raise HTTPNotImplemented
 
         attribute = getattr(single_obj, method)
 
         if not callable(attribute):
-            if attribute:
-                return single_obj
+            if attribute == False:
+                return rv
+        else:
+            if attribute(contact) == False:
+                return rv
 
-        if attribute(contact):
-            return single_obj
+        if hasattr(single_obj, "__schema__"):
+            if callable(single_obj.__schema__):
+                rv = single_obj.__schema__().toDict(contact, fields)
+            else:
+                rv = single_obj.__schema__.toDict(contact, fields)
 
-        return False
+        return rv
 
     def process_response(self, req, resp, resource, req_succeeded):
         if not req_succeeded:
@@ -30,17 +42,17 @@ class GuardMiddleware:
         contact = req.context.user
 
         try:
-            action = resp.context.action
+            action = "view"
             obj = resp.context.media
         except AttributeError:
             return
 
         # i.e. we need both not just one
         if action is None and obj is not None:
-            raise HTTPBadRequest(description="Permissions validation error.")
+            raise HTTPBadRequest(description="Permissions validation error 1.")
 
         if action is not None and obj is None:
-            raise HTTPBadRequest(description="Permissions validation error.")
+            raise HTTPBadRequest(description="Permissions validation error 2.")
 
         # ... but if they're both none then we don't care, bail out
         if action is None and obj is None:
@@ -49,15 +61,20 @@ class GuardMiddleware:
         # Get action method string
         method_string = action.lower() + "_guard"
 
+        fields = []
+        if "fields" in resp.context:
+            fields = resp.context.fields
+
         if isinstance(obj, list):
-            obj = filter(lambda o: self.validate(method_string, o, contact), obj)
-
-        try:
-            func = resp.context.sfunc
-        except:
+            new_list = filter(
+                lambda i: i != False,
+                map(lambda o: self.validate(method_string, o, contact, fields), obj),
+            )
+            new_list = list(new_list)
+            resp.media = new_list
             return
 
-        if func is None:
-            return
-
-        resp.media = func(obj)
+        obj = self.validate(method_string, obj, contact=contact, fields=fields)
+        if obj is False:
+            raise HTTPForbidden
+        resp.media = obj

@@ -1,13 +1,15 @@
+import os
 import secrets
 
 from passlib.hash import argon2
+import chevron
 import boto3
 import settings
 from model import db
 from model.Contact import Contact, EmailAddress, VerifyToken
 from model.Email import EmailMessage, EmailRecipient
 from model.Organisation import Branch, Committee
-from falcon.errors import HTTPNotFound, HTTPBadRequest
+from falcon.errors import HTTPNotFound, HTTPBadRequest, HTTPInternalServerError
 
 ses = boto3.client(
     "sesv2",
@@ -20,6 +22,39 @@ ses = boto3.client(
 class EmailService:
     CHARSET = "UTF-8"
     FROM_EMAIL = "do_not_reply@email.peterboroughtenants.app"
+
+    def render(
+        self,
+        template: str,
+        recipient: Contact = None,
+        sender: Contact = None,
+        context={},
+    ):
+        """
+        Render a moustache template and inject the context variables
+        """
+
+        base_path = os.getcwd()
+        email_path = os.path.abspath(os.path.join(base_path, "templates/emails"))
+
+        if recipient is not None:
+            context["recipient_name"] = recipient.given_name
+            context["membership_no"] = recipient.membership_number
+
+        if sender is not None:
+            context["sender_name"] = sender.name
+
+        if "message" in context:
+            context["message"] = chevron.render(context["message"], context)
+
+        path = f"{email_path}/{template}.html"
+        with open(path, "r") as t:
+            return chevron.render(
+                t,
+                context,
+                partials_path=os.path.join(email_path, "partials/"),
+                partials_ext="html",
+            )
 
     def send(
         self,
@@ -81,15 +116,11 @@ class EmailService:
         Send a verification code to an email address
         """
 
-        code = secrets.randbits(24)
+        code = secrets.randbits(32)
+        code = str(code)[:6]
         message = f"[Peterborough Tenants Union]\nYour email verification code is: \n{str(code)}"
-        html_message = f"""
-        <p><strong>Peterborough Tenants Union</strong></p>
-        <p>Your email verification code is:</p>
-        <h3>{str(code)}</h3>
-        <p>To verify your email address, enter this code into the website when prompted. This
-        code will be valid for 15 minutes.</p>
-        """
+
+        html_message = self.render("verify_code", context={"code": code})
 
         token = self.db.query(VerifyToken).get([VerifyToken.Types.EMAIL, address])
         if token is None:
@@ -109,14 +140,14 @@ class EmailService:
         Verify an email
         """
 
-        token = self.db.query(VerifyToken).get([VerifyToken.Types.EMAIL, email])
+        token = self.db.query(VerifyToken).get([VerifyToken.Types.EMAIL, email.upper()])
         if token is None:
             raise HTTPNotFound
 
         if not argon2.verify(code, token.hash):
             raise HTTPBadRequest(description="Invalid code")
 
-        email = self.db.query(EmailAddress).get(email)
+        email = self.db.query(EmailAddress).get(email.upper())
         if email is None:
             raise HTTPNotFound
 

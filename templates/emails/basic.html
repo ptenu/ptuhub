@@ -1,0 +1,25 @@
+{{>email_head}}
+
+<tr>
+    <td colspan="2">Hi {{recipient_name}},</td>
+</tr>
+
+
+<tr>
+    <td colspan="2">{{{message}}}</td>
+</tr>
+
+<tr>
+    <td colspan="2">
+        <p>
+            In solidarity,
+        </p>
+        <p>
+            {{sender_name}}
+            <br> {{sender_role}}
+        </p>
+    </td>
+</tr>
+
+
+{{>email_footer}}

@@ -65,7 +65,7 @@ class Request(Model):
     )
     host = Column(VARCHAR(256))
     path = Column(VARCHAR(1024))
-    method = Column(VARCHAR(5), nullable=False)
+    method = Column(VARCHAR(6), nullable=False)
     trusted = Column(BOOLEAN, default=False, nullable=False)
     response_code = Column(INTEGER, nullable=True)
     contact_id = Column(

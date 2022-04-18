@@ -7,146 +7,95 @@ from sqlalchemy import Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import backref, relationship
+from model.Schema import Schema
+from services.permissions import user_has_role
 
 from model import Model
 from model import db
 
 
-class Subscription(Model):
+class Payment(Model):
 
-    __tablename__ = "subscriptions"
-
-    class Statuses(Enum):
-        PENDING = "pending"
-        ACTIVE = "active"
-        NEW = "new"
-        CANCELLED = "cancelled"
-        REJECTED = "rejected"
-        PAYMENT_FAILED = "failed payment"
-        LAPSED = "lapsed"
-        ARREARS = "in arrears"
-        SUSPENDED = "suspended"
-        INCOMPLETE = "incomplete"
+    __tablename__ = "payments"
 
     class Types(Enum):
-        STANDARD = "standard"
-        ASSOCIATE = "supporter"
-        AFFILIATE = "affiliated organisation"
+        SUBS = "membership"
+        DONA = "donation"
+        SALE = "purchase"
+        ADHC = "ad-hoc"
+        RNEW = "renewal"
 
-    id = Column(String(255), primary_key=True)
+    id = Column(Integer, primary_key=True)
     contact_id = Column(
         Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
     )
-    start_date = Column(Date, nullable=False, default=date.today())
-    renewal_date = Column(
-        Date, nullable=False, default=date.today() + timedelta(days=30)
-    )
-    stripe_price_id = Column(String(255), nullable=True)
-    stripe_coupon_id = Column(String(255), nullable=True)
-    base_rate = Column(Integer, nullable=False, default=0)
-    discount = Column(Integer, default=0, nullable=False)
+    stripe_payment_intent_id = Column(String(52), nullable=True)
+    stripe_charge_id = Column(String(52), nullable=True)
+    status = Column(String(50), nullable=False, default="created")
+    created_on = Column(Date)
+    last_updated = Column(DateTime)
+    amount = Column(Integer, nullable=False, default=100)
     type = Column(
-        EnumColumn(Types, name="subs_types"), nullable=False, default=Types.STANDARD
+        EnumColumn(Types, name="payment_types"), nullable=False, default=Types.SUBS
     )
-    status = Column(
-        EnumColumn(Statuses, name="subs_statuses"),
-        nullable=False,
-        default=Statuses.PENDING,
+    method_type = Column(String(20))
+    method_last4 = Column(String(4))
+
+    contact = relationship(
+        "Contact", backref=backref("payments", order_by=created_on.desc())
+    )
+
+    def view_guard(self, user):
+        if user is None:
+            return False
+
+        if (
+            user.id == self.contact_id
+            or user_has_role("global.admin")
+            or user_has_role("membership.admin")
+        ):
+            return True
+
+        return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["id", "status", "amount", "method_type", "method_last4"],
+            custom_fields={"date": self.created_on.isoformat()},
+        )
+
+
+class Membership(Model):
+
+    __tablename__ = "memberships"
+
+    id = Column(Integer, primary_key=True)
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
+    )
+    period_start = Column(Date, nullable=False)
+    period_end = Column(Date, nullable=False)
+    month = Column(Integer, nullable=False)
+    year = Column(Integer, nullable=False)
+    status = Column(String(20), default="pending")
+    payment_id = Column(
+        Integer, ForeignKey("payments.id", ondelete="SET NULL", onupdate="CASCADE")
     )
 
     contact = relationship(
-        "Contact", backref=backref("subscriptions", order_by=start_date.desc())
+        "Contact", backref=backref("memberships", order_by=period_start.desc())
+    )
+    payment = relationship(
+        Payment, backref=backref("memberships", order_by=period_start.desc())
     )
 
-    def __init__(self, contact):
+    def __init__(self, contact, start_date: date):
         self.contact = contact
-        self.start_date = date.today()
-        self.renewal_date = date.today() + relativedelta(months=1)
-
-
-class Activity(Model):
-    __tablename__ = "activity"
-
-    class Codes(Enum):
-        JOINED = "join"
-        PAYMENT = "payment"
-        FAILED_PAYMENT = "failed payment"
-        AD_HOC_PAYMENT = "ad hoc payment"
-        CANCELLED = "cancelation"
-        ISSUED_CARD = "card issue"
-        RENEWED = "renewal"
-        SUSPENDED = "suspension"
-        REJECTED = "rejection"
-
-    SET_TO = {
-        Codes.JOINED: Subscription.Statuses.PENDING,
-        Codes.PAYMENT: Subscription.Statuses.ACTIVE,
-        Codes.FAILED_PAYMENT: Subscription.Statuses.PAYMENT_FAILED,
-        Codes.CANCELLED: Subscription.Statuses.CANCELLED,
-        Codes.RENEWED: Subscription.Statuses.ACTIVE,
-        Codes.SUSPENDED: Subscription.Statuses.SUSPENDED,
-        Codes.REJECTED: Subscription.Statuses.REJECTED,
-    }
-
-    id = Column(Integer, primary_key=True)
-    stripe_object_id = Column(String(255), nullable=True, index=True)
-    timestamp = Column(DateTime, default=datetime.now())
-    contact_id = Column(
-        Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
-    )
-    type = Column(EnumColumn(Codes, name="activity_codes"))
-    subscription_id = Column(
-        String(255),
-        ForeignKey("subscriptions.id", ondelete="CASCADE", onupdate="CASCADE"),
-    )
-    value = Column(Integer, nullable=True, default=None)
-    summary = Column(String, nullable=True)
-    meta = Column(Text, nullable=True)
-
-    contact = relationship("Contact", backref="activity")
-    subscription = relationship(Subscription, backref="activity")
-
-    def __init__(self, contact, code, subscription=None):
-        self.contact = contact
-        self.type = code
-
-        if subscription is not None:
-            self.subscription = subscription
-
-            if hasattr(self.SET_TO, code):
-                self.subscription.status = self.SET_TO[code]
-
-            if self.subscription.start_date < datetime.now() - timedelta(weeks=4):
-                return
-
-            if code is self.Codes.PAYMENT:
-                last_payment = (
-                    db.query(Activity)
-                    .filter(Activity.contact_id == self.contact_id)
-                    .filter(Activity.subscription_id == self.subscription_id)
-                    .filter(Activity.type == self.Codes.PAYMENT)
-                    .order_by(Activity.timestamp.desc())
-                    .first()
-                )
-
-                if last_payment is None:
-                    self.subscription.status = Subscription.Statuses.NEW
-
-            if code is self.Codes.FAILED_PAYMENT:
-                last_payment = (
-                    db.query(Activity)
-                    .filter(Activity.contact_id == self.contact_id)
-                    .filter(Activity.subscription_id == self.subscription_id)
-                    .filter(Activity.type == self.Codes.PAYMENT)
-                    .order_by(Activity.timestamp.desc())
-                    .first()
-                )
-
-                if last_payment is None:
-                    self.subscription.status = Subscription.Statuses.INCOMPLETE
-
-                if last_payment.timestamp < datetime.now() - timedelta(weeks=6):
-                    self.subscription.status = Subscription.Statuses.ARREARS
+        self.period_start = start_date
+        self.period_end = start_date + relativedelta(months=1)
+        self.month = start_date.month
+        self.year = start_date.year
 
 
 class MembershipCard(Model):
@@ -158,6 +107,7 @@ class MembershipCard(Model):
     )
     date = Column(Date, default=datetime.today())
     barcode_img_id = Column(String(10), ForeignKey("files.id"))
+    status = Column(String(10), default="generated")
 
     contact = relationship("Contact", backref="membership_cards")
 
@@ -169,21 +119,3 @@ class MembershipCard(Model):
         name = self.contact.family_name[:4].upper()
         urn = self.contact.membership_number
         return f"{str(self.date.month).zfill(3)}{name}{self.date.year}{urn}0"
-
-
-class OnboardingToken(Model):
-
-    __tablename__ = "onboarding_tokens"
-
-    id = Column(String(255), primary_key=True)
-    contact_id = Column(
-        Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
-    )
-
-    contact = relationship("Contact", backref="ob_tokens")
-
-    def __init__(self, contact=None):
-        if contact is not None:
-            self.contact = contact
-
-        self.id = uuid.uuid4()

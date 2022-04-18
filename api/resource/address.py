@@ -4,75 +4,105 @@ import json
 from api.middleware.authentication import EnforceRoles
 import falcon
 from sqlalchemy.sql.expression import func
-from falcon.errors import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest
+from falcon.errors import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest, HTTPForbidden
 from model.Address import Address, AddressNote, Postcode, Street, SurveyReturn
 from model.Contact import Contact
-from api.schemas.address import AddressSchema, StreetSchema
+from services.permissions import trusted_user
+
+
+def distance(latlong1, latlong2):
+    return func.sqrt(
+        func.pow(latlong1[0] - latlong2[0], 2) + func.pow(latlong1[1] - latlong2[1], 2)
+    )
 
 
 class AddressResource:
-    @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
-    def on_get(self, req, resp, uprn):
+    def on_get(self, req, resp):
 
-        addr = self.session.query(Address).get(uprn)
+        params = req.params
 
-        if addr is None:
-            raise HTTPNotFound
-
-        schema = AddressSchema(addr)
-        resp.text = json.dumps(schema.extended)
-
-    def on_get_near(self, req, resp, lat, lng):
-        """
-        Return nearby addresses
-        """
-
-        if req.context.user is None:
-            raise HTTPUnauthorized
-
-        lat = float(lat)
-        lng = float(lng)
-        position = (lat, lng)
-
-        bounds = ((lat - 0.0003, lat + 0.0003), (lng - 0.0003, lng + 0.0003))
-
-        def distance(latlong1, latlong2):
-            return func.sqrt(
-                func.pow(latlong1[0] - latlong2[0], 2)
-                + func.pow(latlong1[1] - latlong2[1], 2)
+        if len(params) < 1:
+            raise HTTPBadRequest(
+                description="There are a lot of addresses, you must provide a search query."
             )
 
-        addrs = (
-            self.session.query(Address)
-            .filter(Address.latitude.between(bounds[0][0], bounds[0][1]))
-            .filter(Address.longitude.between(bounds[1][0], bounds[1][1]))
-            .order_by(distance(position, (Address.latitude, Address.longitude)))
-            .limit(50)
+        addr = self.session.query(Address)
+
+        try:
+            trusted_user(req.context.user)
+            tu = True
+        except:
+            tu = False
+
+        if "all" not in params or not tu:
+            addr = addr.filter(Address.classification_code.startswith("R"))
+
+        for p in params:
+            if p == "postcode":
+                pc = str(params[p]).upper()
+
+                postcode = self.session.query(Postcode).get(pc)
+                if postcode is None:
+                    raise HTTPNotFound(description="That postcode does not exist")
+                addr = addr.filter(Address.postcode == pc)
+
+            if p == "street":
+                try:
+                    usrn = int(params[p])
+                except ValueError:
+                    raise HTTPBadRequest(description="Street ID must be a number")
+
+                street = self.session.query(Street).get(usrn)
+                if street is None:
+                    raise HTTPNotFound(description="Street not found.")
+
+                addr = addr.filter(Address.usrn == usrn)
+
+            if p == "near":
+                lat, long = str(params[p]).split(",", 1)
+                lat, long = float(lat), float(long)
+                position = (lat, long)
+                bounds = ((lat - 0.0003, lat + 0.0003), (long - 0.0003, long + 0.0003))
+
+                addr = (
+                    addr.filter(Address.latitude.between(bounds[0][0], bounds[0][1]))
+                    .filter(Address.longitude.between(bounds[1][0], bounds[1][1]))
+                    .order_by(distance(position, (Address.latitude, Address.longitude)))
+                )
+
+        addr = (
+            addr.order_by(
+                Address.pao_start_number,
+                Address.pao_end_number,
+                Address.sao_start_number,
+                Address.sao_end_number,
+                Address.pao_text,
+                Address.sao_text,
+            )
+            .limit(100)
+            .all()
         )
+        resp.context.media = addr
+        resp.context.fields = ["uprn", "single_line", "street_id", "classification"]
 
-        result = list(map(AddressSchema.map_with_contact, addrs))
-
-        resp.text = json.dumps(result)
-
-    @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
-    def on_get_notes(self, req, resp, uprn):
-        """
-        Get all notes for an address
-        """
-
+    def on_get_single(self, req, resp, uprn):
         addr = self.session.query(Address).get(uprn)
 
         if addr is None:
             raise HTTPNotFound
 
-        schema = AddressSchema(addr)
-        resp.text = json.dumps(schema.notes)
+        resp.context.media = addr
+        resp.context.action = "view"
 
-    @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
     def on_put_notes(self, req, resp, uprn):
         """
         Add a note to an address
         """
+
+        try:
+            trusted_user(req.context.user)
+        except:
+            raise HTTPForbidden
 
         addr = self.session.query(Address).get(uprn)
 
@@ -97,7 +127,6 @@ class AddressResource:
         self.session.commit()
         resp.status = 201
 
-    @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
     def on_delete_note(self, req, resp, uprn, id):
         """
         Set a note as withdrawn
@@ -107,112 +136,25 @@ class AddressResource:
         if note is None:
             raise HTTPNotFound
 
+        try:
+            trusted_user(req.context.user)
+            assert req.context.user.id == note.contact_id
+        except:
+            raise HTTPForbidden
+
         note.withdrawn = True
         self.session.commit()
         resp.status = 204
-
-    def on_get_postcode(self, req, resp, outcode: str, incode: str):
-        """
-        Return a list of all addresses in a postcode unit
-        """
-
-        pc_string = f"{outcode} {incode}".upper()
-        pc: Postcode = self.session.query(Postcode).get(pc_string)
-        if pc is None:
-            raise HTTPNotFound
-
-        addresses = (
-            self.session.query(Address)
-            .filter(Address.postcode == pc.pcds)
-            .filter(Address.classification_code.startswith("R"))
-            .order_by(
-                Address.pao_start_number,
-                Address.pao_end_number,
-                Address.sao_start_number,
-                Address.sao_end_number,
-                Address.pao_text,
-                Address.sao_text,
-            )
-            .all()
-        )
-
-        resp.text = json.dumps(list(map(AddressSchema.map_simple, addresses)))
-
-    def on_get_street(self, req, resp, outcode: str):
-        """
-        Return a list of streets for a given postcode sector
-        * If a district is entered (i.e. PE2) then a list of sectors is returned.
-        """
-        if req.context.user is None:
-            raise HTTPUnauthorized
-
-        if len(outcode) == 3:
-            # Get the sectors in a district
-            pcds = (
-                self.session.query(Postcode)
-                .filter(Postcode.pcds.startswith(outcode.upper()))
-                .all()
-            )
-
-            sectors = []
-            for pc in pcds:
-                s = pc.pcds[:5]
-                if s not in sectors:
-                    sectors.append(s)
-
-            resp.text = json.dumps(sectors)
-            return
-
-        if len(outcode) == 4:
-            sector = outcode[3]
-            outcode = outcode[:3]
-            outcode = f"{outcode} {sector}".upper()
-
-            usrns = (
-                self.session.query(Address.usrn)
-                .filter(Address.postcode.startswith(outcode.upper()))
-                .distinct()
-                .all()
-            )
-
-            usrns = list(map(lambda usrn: usrn[0], usrns))
-
-            streets = (
-                self.session.query(Street)
-                .filter(Street.usrn.in_(usrns))
-                .order_by(Street.description)
-                .all()
-            )
-            result = list(map(StreetSchema.map_simple, streets))
-            resp.text = json.dumps(result)
-            return
-
-        raise HTTPBadRequest(
-            title="URL paramater incorrect",
-            description="Please enter a postcode district (e.g. PE2) or a sector (e.g. PE25).",
-        )
-
-    @falcon.before(EnforceRoles, ["organiser", "rep", "officer"])
-    def on_get_returns(self, req, resp, uprn):
-        """
-        Return a list of data gathered for a specific address
-        """
-
-        addr = self.session.query(Address).get(uprn)
-
-        if addr is None:
-            raise HTTPNotFound
-
-        result = AddressSchema(addr).returns
-        resp.text = json.dumps(result)
 
     def on_put_returns(self, req, resp, uprn):
         """
         Add a new return
         """
 
-        if req.context.user is None:
-            raise HTTPUnauthorized
+        try:
+            trusted_user(req.context.user)
+        except:
+            raise HTTPForbidden
 
         addr = self.session.query(Address).get(uprn)
 
@@ -269,32 +211,33 @@ class AddressResource:
 
 
 class StreetResource:
-    def on_get(self, req, resp, usrn: int):
+    def on_get(self, req, resp):
         """
-        Return a list of addresses for a given street
+        Return a list of streets for a given postcode sector
+        * If a district is entered (i.e. PE2) then a list of sectors is returned.
         """
-        if req.context.user is None:
-            raise HTTPUnauthorized
+        try:
+            trusted_user(req.context.user)
+        except:
+            raise HTTPForbidden
 
-        street = self.session.query(Street).get(usrn)
-        if street is None:
-            raise HTTPNotFound
+        if "q" not in req.params:
+            raise HTTPBadRequest(description="Search parameter missing from URL query.")
 
-        addresses = (
-            self.session.query(Address)
-            .filter(Address.usrn == usrn)
-            .order_by(
-                Address.pao_start_number,
-                Address.pao_end_number,
-                Address.sao_start_number,
-                Address.sao_end_number,
-                Address.pao_text,
-                Address.sao_text,
+        if len(req.params["q"]) < 4:
+            raise HTTPBadRequest(
+                description="Search string must be at least 4 characters."
             )
+
+        query = req.params["q"].upper()
+
+        streets = (
+            self.session.query(Street)
+            .filter(Street.description.like(f"%{query}%"))
+            .order_by(Street.description)
+            .limit(15)
             .all()
         )
 
-        addresses = list(map(AddressSchema.map_simple, addresses))
-        result = StreetSchema(street).extended(addresses)
-
-        resp.text = json.dumps(result)
+        resp.context.media = streets
+        resp.context.action = "view"

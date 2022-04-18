@@ -1,0 +1,60 @@
+<html>
+    <head>
+        <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+         <meta name="viewport" content="width=device-width, initial-scale=1.0">
+        <style type="text/css">
+            @import url('https://fonts.googleapis.com/css2?family=Inter&display=swap');
+            * {
+                font-family: 'Inter', 'Inter var', 'Inter V', Arial, Helvetica, sans-serif;
+                font-size: 13pt;
+                box-sizing: border-box;
+                color: #1D252C;
+            }
+            a, p {
+                font-size: inherit;
+            }
+            table {
+                border-collapse: collapse;
+                border: none;
+                padding: 0 8px;
+                max-width: 480px;
+                margin: 0 auto;
+            }
+            td {
+                padding: 16px 8px;
+                padding: 2ex 1ex;
+                vertical-align: top;
+            }
+            h1 {
+                font-size: 19pt;
+                font-weight: 600;
+                color: #E54360;
+            }
+            h2 {
+                font-size: 17pt;
+                font-weight: 600;
+                color: #663C44;
+            }
+            h3 {
+                font-size: 15pt;
+                font-weight: 600;
+                color: #093B5A;
+            }
+        </style>
+    </head>
+    <body>
+        <table>
+            <tr style="border-bottom: 3px solid #D6D1C4;">
+                <td style="font-size: 11pt">
+                    <strong style="font-size: 11pt">Peterborough Tenants Union</strong>
+                    {{#recipient_description}}
+                        <br>
+                        <strong style="font-size: 11pt">To: {{recipient_description}}</strong>
+                    {{/recipient_description}}
+                </td>
+                <td style="text-align: right; font-size: 11pt">
+                    {{membership_no}}
+                </td>
+            </tr>
+            
+            

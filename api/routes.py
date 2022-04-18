@@ -4,6 +4,7 @@ import api.resource.login as login
 import api.resource.content as content
 import api.resource.address as address
 import api.resource.session as session
+import api.resource.organisation as org
 
 
 class Routes:
@@ -35,31 +36,34 @@ class Routes:
             contacts.ContactsResource(),
             suffix="email",
         )
+        app.add_route("/contacts/{id}/note", contacts.ContactsResource(), suffix="note")
+        app.add_route(
+            "/contacts/{id}/note/{note_id}", contacts.ContactsResource(), suffix="note"
+        )
+        app.add_route(
+            "/contacts/{id}/consent", contacts.ContactsResource(), suffix="consent"
+        )
+        app.add_route(
+            "/contacts/{id}/consent/{consent_id}",
+            contacts.ContactsResource(),
+            suffix="consent",
+        )
         app.add_route(
             "/contacts/{id}/phone/{number}", contacts.ContactsResource(), suffix="sms"
         )
         app.add_route("/verify", contacts.ContactsResource(), suffix="verify")
-        app.add_route("/contact/{id}/address", contacts.AddressResource())
+        app.add_route("/contacts/{id}/address", contacts.AddressResource())
 
         # Address
-        app.add_route("/address/{uprn}", address.AddressResource())
+        app.add_route("/addresses", address.AddressResource())
+        app.add_route("/addresses/{uprn}", address.AddressResource(), suffix="single")
         app.add_route(
-            "/address/near/{lat}/{lng}", address.AddressResource(), suffix="near"
+            "/addresses/{uprn}/notes/{id}", address.AddressResource(), suffix="note"
         )
         app.add_route(
-            "/address/{uprn}/notes", address.AddressResource(), suffix="notes"
+            "/addresses/{uprn}/returns", address.AddressResource(), suffix="returns"
         )
-        app.add_route(
-            "/address/{uprn}/notes/{id}", address.AddressResource(), suffix="note"
-        )
-        app.add_route(
-            "/address/{uprn}/returns", address.AddressResource(), suffix="returns"
-        )
-        app.add_route(
-            "/postcode/{outcode}/{incode}", address.AddressResource(), suffix="postcode"
-        )
-        app.add_route("/postcode/{outcode}", address.AddressResource(), suffix="street")
-        app.add_route("/street/{usrn}", address.StreetResource())
+        app.add_route("/streets", address.StreetResource())
 
         # Content
         app.add_route("/pages", content.PublicPageResource(), suffix="all")
@@ -73,3 +77,7 @@ class Routes:
         app.add_route(
             "/pages/manage/{slug}", content.AdminPageResource(), suffix="page"
         )
+
+        # Organisation
+        app.add_route("/branches", org.BranchResource())
+        app.add_route("/committees", org.CommitteeResource())

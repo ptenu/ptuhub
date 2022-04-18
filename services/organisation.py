@@ -1,16 +1,21 @@
+from sqlalchemy import func
 from model import db
-from model.Contact import Contact
 
 
 def get_branch_members(branch):
-    contacts = []
+    from model.Address import Address
+    from model.Contact import Contact, ContactAddress
+    from model.Organisation import Branch, BranchArea
 
-    for area in branch.areas:
-        contacts.extend(
-            db.query(Contact)
-            .filter(Contact.membership_number != None)
-            .filter(Contact.postcode.startswith(area.postcode))
-            .all()
-        )
-
+    subquery = (
+        db.query(Branch)
+        .join(Branch.areas)
+        .join(ContactAddress, Contact.lives_at == ContactAddress.id)
+        .join(Address, Address.uprn == ContactAddress.uprn)
+        .filter(Address.postcode.like(BranchArea.postcode + "%"))
+        .order_by(func.length(BranchArea.postcode).desc())
+        .limit(1)
+        .subquery()
+    )
+    contacts = db.query(Contact).filter(subquery == branch.id).cte()
     return contacts

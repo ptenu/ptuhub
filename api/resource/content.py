@@ -1,8 +1,9 @@
-from falcon.errors import HTTPNotFound
+from falcon.errors import HTTPNotFound, HTTPForbidden
 from falcon.status_codes import HTTP_204
 import api.middleware.authentication as auth
 from api.interface.cms import ContentInterface
-import falcon
+
+from services.permissions import InvalidPermissionError, user_has_role
 
 
 class PublicPageResource:
@@ -54,9 +55,16 @@ class PublicPageResource:
         }
 
 
-@falcon.before(auth.EnforceRoles, ["cms.manage"])
 class AdminPageResource:
     def on_get_pages(self, req, resp):
+        try:
+            user_has_role(req.context.user, "global.admin")
+        except InvalidPermissionError:
+            try:
+                user_has_role(req.context.user, "cms.admin")
+            except:
+                raise HTTPForbidden
+
         category = None
 
         if "category" in req.params:
@@ -81,6 +89,14 @@ class AdminPageResource:
         resp.media = page_list
 
     def on_get_page(self, req, resp, slug: str):
+        try:
+            user_has_role(req.context.user, "global.admin")
+        except InvalidPermissionError:
+            try:
+                user_has_role(req.context.user, "cms.admin")
+            except:
+                raise HTTPForbidden
+
         page = ContentInterface(self.session).get_pages(slug=slug, all=True)
         if page is None:
             raise HTTPNotFound
@@ -103,6 +119,14 @@ class AdminPageResource:
         }
 
     def on_post_pages(self, req, resp):
+        try:
+            user_has_role(req.context.user, "global.admin")
+        except InvalidPermissionError:
+            try:
+                user_has_role(req.context.user, "cms.admin")
+            except:
+                raise HTTPForbidden
+
         current_user = req.context.user
         attributes = req.get_media()
         page = ContentInterface(self.session).create_page(
@@ -127,6 +151,14 @@ class AdminPageResource:
         }
 
     def on_patch_page(self, req, resp, slug: str):
+        try:
+            user_has_role(req.context.user, "global.admin")
+        except InvalidPermissionError:
+            try:
+                user_has_role(req.context.user, "cms.admin")
+            except:
+                raise HTTPForbidden
+
         attributes = req.get_media()
         page = ContentInterface(self.session).update_page(slug=slug, **attributes)
         resp.media = {
@@ -148,6 +180,14 @@ class AdminPageResource:
         }
 
     def on_delete_page(self, req, resp, slug: str):
+        try:
+            user_has_role(req.context.user, "global.admin")
+        except InvalidPermissionError:
+            try:
+                user_has_role(req.context.user, "cms.admin")
+            except:
+                raise HTTPForbidden
+
         ContentInterface(self.session).delete_page(slug)
 
         resp.status = HTTP_204

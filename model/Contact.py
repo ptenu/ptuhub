@@ -2,15 +2,17 @@ import json
 from datetime import datetime, timedelta
 from enum import Enum
 from typing import Dict
+from model.Schema import Schema
 
 from services.files import FileService
 from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from sqlalchemy.sql.expression import func
 
 from model import Model
+from services.permissions import trusted_user, user_has_role
 
 
 class Contact(Model):
@@ -34,18 +36,19 @@ class Contact(Model):
     # Membership
     membership_number = Column(String(15))
     joined_on = Column(Date)
-    membership_type = Column(String(1))
+    membership_type = Column(String(1), default="S")
     stripe_customer_id = Column(String(52))
-    postcode = Column(String(8), nullable=True)
 
     # Contact
     prefered_email = Column(String(1024), ForeignKey("contact_emails.address"))
     prefered_phone = Column(String(15), ForeignKey("contact_numbers.number"))
+    lives_at = Column(BigInteger, ForeignKey("contact_addresses.id"))
 
     # Account
     password_hash = Column(String(255), nullable=True)
     account_blocked = Column(Boolean, nullable=False, default=False)
 
+    # Relationships
     email = relationship(
         "EmailAddress", backref="main_for", foreign_keys=[prefered_email]
     )
@@ -53,6 +56,36 @@ class Contact(Model):
         "TelephoneNumber", backref="main_for", foreign_keys=[prefered_phone]
     )
     avatar = relationship("File", backref="avatar_user", foreign_keys=[avatar_id])
+
+    def view_guard(self, user):
+        if user is not None and user.id == self.id:
+            return True
+
+        try:
+            user_has_role(user, "global.admin")
+            return True
+        except:
+            try:
+                user_has_role(user, "membership.admin")
+            except:
+                return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            [
+                "id",
+                "name",
+                "membership_number",
+                "first_language",
+                "pronouns",
+                "notes",
+                "email_addresses",
+                "phone_numbers",
+                "consents",
+            ],
+            custom_fields={"addresses": self.address_list},
+        )
 
     @property
     def name(self):
@@ -71,6 +104,27 @@ class Contact(Model):
         if self.other_names is not None:
             name += " " + self.other_names.capitalize()
         return name
+
+    @property
+    def address_list(self):
+        addrs = []
+        for a in self.addresses:
+            addr = {}
+            if not a.active:
+                continue
+
+            if a.custom_address is not None:
+                addr["address"] = a.custom_address
+
+            if a.uprn is not None:
+                addr["uprn"] = a.uprn
+                addr["address"] = a.address.single_line
+
+            addr["tenure"] = str(a.tenure)
+            addr["current_residence"] = self.lives_at == a.id
+            addrs.append(addr)
+
+        return addrs
 
 
 class EmailAddress(Model):
@@ -93,6 +147,29 @@ class EmailAddress(Model):
     def __init__(self, contact, address):
         self.contact = contact
         self.address = address.upper()
+
+    def view_guard(self, user):
+        if user is not None and user.id == self.contact_id:
+            return True
+
+        try:
+            user_has_role(user, "global.admin")
+            return True
+        except:
+            try:
+                user_has_role(user, "membership.admin")
+            except:
+                return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["address"],
+            custom_fields={
+                "verified": "Y" if self.verified else "N",
+                "blocked": "Y" if self.blocked else "N",
+            },
+        )
 
     def __str__(self):
         return self.address.upper()
@@ -150,6 +227,22 @@ class TelephoneNumber(Model):
         number = number.replace(" ", "")
         self.number = number
 
+    def view_guard(self, user):
+        if user is not None and user.id == self.contact_id:
+            return True
+
+        try:
+            user_has_role(user, "global.admin")
+            return True
+        except:
+            try:
+                user_has_role(user, "membership.admin")
+            except:
+                return False
+
+    def __schema__(self):
+        return Schema(self, ["number", "description"])
+
     @property
     def description(self):
         for code in self.CODES:
@@ -175,15 +268,17 @@ class ContactAddress(Model):
         Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE")
     )
     uprn = Column(
-        BigInteger,
-        ForeignKey("addresses.uprn", onupdate="CASCADE", ondelete="SET NULL"),
+        BigInteger, ForeignKey("addresses.uprn", onupdate="CASCADE", ondelete="CASCADE")
     )
     custom_address = Column(Text)
     mail_to = Column(Boolean, nullable=False, default=True)
     tenure = Column(EnumColumn(Tenure))
     active = Column(Boolean, nullable=False, default=True)
 
-    contact = relationship(Contact, backref="address_relations")
+    contact = relationship(Contact, backref="addresses", foreign_keys=[contact_id])
+    residents = relationship(
+        Contact, backref="address", foreign_keys=[Contact.lives_at]
+    )
 
 
 class Consent(Model):
@@ -210,6 +305,24 @@ class Consent(Model):
     # Relationships
     contact = relationship(Contact, backref="consents")
 
+    def view_guard(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+        try:
+            user_has_role(user, "global.admin")
+        except:
+            if user.id != self.contact_id:
+                return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["consent_id", "group", "code", "wording"],
+        )
+
 
 class Note(Model):
 
@@ -231,8 +344,36 @@ class Note(Model):
     )
 
     # Relationships
-    contact = relationship(Contact, backref="notes", foreign_keys=[contact_id])
-    contact = relationship(Contact, backref="notes_created", foreign_keys=[_created_by])
+    contact = relationship(
+        Contact,
+        backref=backref("notes", order_by="desc(Note._created_on)"),
+        foreign_keys=[contact_id],
+    )
+    added_by = relationship(
+        Contact, backref="notes_created", foreign_keys=[_created_by]
+    )
+
+    def view_guard(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+        try:
+            user_has_role(user, "global.admin")
+        except:
+            if user.id == self.contact_id or user.id != self._created_by:
+                return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["id", "content"],
+            custom_fields={
+                "added_by": self.added_by.name,
+                "date": self._created_on.isoformat(),
+            },
+        )
 
 
 class VerifyToken(Model):
@@ -266,6 +407,17 @@ class Role(Model):
 
     contact = relationship(Contact, backref="roles")
 
+    def view_guard(self, user):
+        try:
+            trusted_user(user)
+            user_has_role(user, "global.admin")
+        except:
+            return False
+
+    @property
+    def __schema__(self):
+        return Schema(self, ["name"])
+
 
 class Availability(Model):
     __tablename__ = "contact_availability"
@@ -285,9 +437,11 @@ class Availability(Model):
         ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE"),
         primary_key=True,
     )
-    timestamp = Column(DateTime, default=func.now(), primary_key=True)
+    start_time = Column(DateTime, default=func.now(), primary_key=True)
     status = Column(EnumColumn(AvailabilityStatuses), nullable=False)
     latitude = Column(Float(precision=8, decimal_return_scale=7), nullable=True)
     longitude = Column(Float(precision=8, decimal_return_scale=7), nullable=True)
 
-    contact = relationship(Contact, backref="statuses")
+    contact = relationship(
+        Contact, backref=backref("statuses", order_by=start_time.desc())
+    )

@@ -1,12 +1,16 @@
 from enum import Enum
 
+from services.permissions import trusted_user, user_has_role
 from sqlalchemy import BigInteger, Boolean, Column, Date
 from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import backref, relationship
+from sqlalchemy.sql.expression import func
 
-from model import Model
-from model import db
+from model import Model, db
+from model.Organisation import Branch, BranchArea
+
+from .Schema import Schema
 
 
 class Address(Model):
@@ -63,6 +67,48 @@ class Address(Model):
 
     def __init__(self, uprn):
         self.uprn = uprn
+
+    @property
+    def __schema__(self):
+        return Schema(
+            self,
+            [
+                "uprn",
+                "single_line",
+                "postcode",
+                "multiline",
+                "branch",
+                "notes",
+                "multi_occupancy",
+                "survey_returns",
+            ],
+            custom_fields={
+                "coordinates": [self.latitude, self.longitude],
+                "classification": f"({self.classification_code}) {self.classification.class_desc}",
+                "street_id": self.usrn,
+            },
+        )
+
+    def view_guard(self, contact):
+        return True
+
+    def coordinates_filter(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+    def classification_filter(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+    def multi_occupancy_filter(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
 
     @property
     def sao_str(self):
@@ -157,6 +203,20 @@ class Address(Model):
 
         return address
 
+    @property
+    def branch(self):
+        filter_func = func.substr(self.postcode, 1, func.length(BranchArea.postcode))
+        area: BranchArea = (
+            db.query(BranchArea)
+            .filter(BranchArea.postcode == filter_func)
+            .order_by(func.length(BranchArea.postcode).desc())
+        ).first()
+
+        if area is None:
+            return None
+
+        return area.branch
+
 
 class Street(Model):
     __tablename__ = "streets"
@@ -187,6 +247,29 @@ class Street(Model):
     def __init__(self, usrn):
         self.usrn = usrn
 
+    def view_guard(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["usrn", "description", "locality", "town", "admin_area"],
+            custom_fields={
+                "surface": self.SURFACES[self.surface_code]
+                if self.surface_code is not None
+                else None,
+                "classification": self.CLASSIFICATIONS[self.classification_code]
+                if self.classification_code is not None
+                else None,
+                "state": self.STATES[self.state_code]
+                if self.state_code is not None
+                else None,
+            },
+        )
+
     def __str__(self):
         return self.description.upper()
 
@@ -212,6 +295,10 @@ class Classification(Model):
 
     def __init__(self, code):
         self.code = code
+
+    @property
+    def __schema__(self):
+        return Schema(self, ["code"], custom_fields={"description": self.class_desc})
 
     def __str__(self):
         return self.class_desc
@@ -339,14 +426,33 @@ class AddressNote(Model):
     address = relationship("Address", backref="notes")
     added_by = relationship("Contact", backref="address_notes")
 
+    def view_guard(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+        try:
+            user_has_role(user, "global.admin")
+        except:
+            if user.id != self.added_by.id:
+                return False
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["id", "date", "date", "body"],
+            custom_fields={"added_by": self.added_by.name},
+        )
+
 
 class SurveyReturn(Model):
     __tablename__ = "survey_returns"
 
     QUESTIONS = {
         "tenure": "tenure",
-        "response_2": "unused_1",
-        "response_3": "unused_2",
+        "response_2": "previously_rented",
+        "response_3": "hmo",
         "response_4": "unused_3",
     }
 
@@ -368,5 +474,54 @@ class SurveyReturn(Model):
     response_4 = Column(String(1), nullable=True)
     answered = Column(Boolean, nullable=False, default=True)
 
-    address = relationship("Address", backref="survey_returns")
+    address = relationship(
+        "Address", backref=backref("survey_returns", order_by="desc(SurveyReturn.date)")
+    )
     added_by = relationship("Contact", backref="survey_returns")
+
+    def view_guard(self, user):
+        try:
+            trusted_user(user)
+        except:
+            return False
+
+    def __schema__(self):
+        responses = {}
+        for q in self.QUESTIONS:
+            if self.QUESTIONS[q].startswith("unused"):
+                continue
+            attr = getattr(self, q)
+            if isinstance(attr, Enum):
+                responses[self.QUESTIONS[q]] = attr.name
+                continue
+
+            responses[self.QUESTIONS[q]] = attr
+
+        return Schema(
+            self,
+            ["date", "id"],
+            custom_fields={
+                "responses": responses,
+                "collected_by": self.added_by.name,
+                "answered": "yes" if self.answered else "no",
+            },
+        )
+
+
+class HmoLicense(Model):
+    __tablename__ = "hmo_register"
+
+    id = Column(Integer, primary_key=True)
+    uprn = Column(BigInteger, ForeignKey("addresses.uprn", ondelete="CASCADE"))
+    license_no = Column(String(20))
+    holder_name = Column(String(100))
+    holder_address = Column(Text)
+    start_date = Column(Date)
+    term = Column(Integer)
+    bedrooms = Column(Integer)
+    max_persons = Column(Integer)
+
+    address = relationship(
+        "Address",
+        backref=backref("hmo_licenses", order_by="desc(HmoLicense.start_date)"),
+    )

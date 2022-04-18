@@ -2,15 +2,15 @@ import secrets
 
 from passlib.hash import argon2
 from twilio.rest import Client
+from services.zadarma import ZadarmaAPI
 import settings
 from falcon.errors import HTTPNotFound, HTTPBadRequest
 from model.Contact import Contact, TelephoneNumber, VerifyToken
 from sqlalchemy.orm import Session
 
-client = Client(
-    settings.config["twilio"].get("account_sid"),
-    settings.config["twilio"].get("auth_token"),
-)
+Z_KEY = settings.config["zadarma"].get("key")
+Z_SECRET = settings.config["zadarma"].get("secret")
+z = ZadarmaAPI(key=Z_KEY, secret=Z_SECRET)
 
 
 class SmsService:
@@ -37,12 +37,13 @@ class SmsService:
         if phone_number not in list(map(lambda n: n.number, endpoints)):
             phone_number = endpoints[0]
 
-        phone_number = f"+44{phone_number[1:]}"
+        if phone_number[:1] == "0":
+            phone_number = "44" + phone_number[1:]
 
-        response = client.messages.create(
-            messaging_service_sid="MGa23d6bba04c304656f9d4e7b4aa7befa",
-            to=phone_number,
-            body=message,
+        response = z.call(
+            "/v1/sms/send/",
+            {"number": phone_number, "message": message, "caller_id": "448007074202"},
+            "post",
         )
 
         return response
@@ -51,7 +52,8 @@ class SmsService:
         """
         Send a verification text to a single number
         """
-        code = secrets.randbits(16)
+        code = secrets.randbits(32)
+        code = str(code)[:6]
         message = f"Your phone number verification code is: \n{str(code)}"
 
         token = self.db.query(VerifyToken).get([VerifyToken.Types.PHONE, number])
@@ -65,14 +67,16 @@ class SmsService:
 
         self.db.commit()
 
-        if not number.startswith("+44"):
-            number = f"+44{number[1:]}"
+        if number[:1] == "0":
+            number = "44" + number[1:]
 
-        return client.messages.create(
-            messaging_service_sid="MGa23d6bba04c304656f9d4e7b4aa7befa",
-            to=number,
-            body=message,
+        response = z.call(
+            "/v1/sms/send/",
+            {"number": number, "message": message, "caller_id": "448007074202"},
+            "post",
         )
+
+        return response
 
     def validate(self, number: str, code):
         """

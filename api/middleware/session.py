@@ -59,15 +59,16 @@ class SessionManager:
             return
 
         # Get any headers we might need
-        session_id = req.get_header("X-Session-Id")
         client_hash = req.get_header("X-Client-Id")
         verification_code = req.get_header("X-Verification-Code")
 
         # Get the session
-        if session_id is None:
+        if "SESSION_ID" not in req.cookies:
             raise HTTPUnauthorized(
                 title="Invalid token", description="Missing session ID header"
             )
+
+        session_id = req.cookies["SESSION_ID"]
 
         if client_hash is None:
             raise HTTPUnauthorized(
@@ -127,7 +128,7 @@ class SessionManager:
 
         request: Request = req.context.request
 
-        code = resp.status[:3]
+        code = str(resp.status)[:3]
 
         request.end(int(code))
         db.commit()

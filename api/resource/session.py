@@ -96,3 +96,4 @@ class SessionResource:
 
         self.session.commit()
         resp.media = {"session_id": session.id}
+        resp.set_cookie("SESSION_ID", session.id)
