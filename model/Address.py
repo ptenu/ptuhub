@@ -77,7 +77,6 @@ class Address(Model):
                 "single_line",
                 "postcode",
                 "multiline",
-                "branch",
                 "notes",
                 "multi_occupancy",
                 "survey_returns",
@@ -86,6 +85,7 @@ class Address(Model):
                 "coordinates": [self.latitude, self.longitude],
                 "classification": f"({self.classification_code}) {self.classification.class_desc}",
                 "street_id": self.usrn,
+                "branch": self.branch.formal_name,
             },
         )
 

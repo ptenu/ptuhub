@@ -48,6 +48,16 @@ class Contact(Model):
     password_hash = Column(String(255), nullable=True)
     account_blocked = Column(Boolean, nullable=False, default=False)
 
+    @property
+    def postcode(self):
+        if self.address is None:
+            return None
+
+        if self.address.uprn is None:
+            return None
+
+        return self.address.address.postcode
+
     # Relationships
     email = relationship(
         "EmailAddress", backref="main_for", foreign_keys=[prefered_email]
