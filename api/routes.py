@@ -80,4 +80,12 @@ class Routes:
 
         # Organisation
         app.add_route("/branches", org.BranchResource())
+        app.add_route("/branches/{branch_id}", org.BranchResource(), suffix="single")
         app.add_route("/committees", org.CommitteeResource())
+        app.add_route(
+            "/committees/{committee_id}", org.CommitteeResource(), suffix="single"
+        )
+        app.add_route("/role", org.RoleResource())
+        app.add_route(
+            "/contact/{id}/role/{role_id}", org.RoleResource(), suffix="single"
+        )

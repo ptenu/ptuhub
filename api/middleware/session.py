@@ -15,11 +15,10 @@ NO_VALIDATION_URLS = ("/session", "/")
 
 class SessionManager:
     def __validate_hash(self, session_id, client_id, resp):
-        cutoff = datetime.now() - timedelta(seconds=30)
+        cutoff = datetime.now() - timedelta(seconds=5)
         request = (
             db.query(Request)
             .filter(Request.session_id == session_id)
-            .filter(Request.started > cutoff)
             .filter(Request.return_hash == client_id)
             .first()
         )
@@ -31,8 +30,8 @@ class SessionManager:
             db.query(Request)
             .filter(Request.session_id == session_id)
             .filter(Request.return_hash != None)
+            .filter(Request.started > cutoff)
             .order_by(Request.started.desc())
-            .limit(3)
             .all()
         )
 
@@ -60,7 +59,6 @@ class SessionManager:
 
         # Get any headers we might need
         client_hash = req.get_header("X-Client-Id")
-        verification_code = req.get_header("X-Verification-Code")
 
         # Get the session
         if "SESSION_ID" not in req.cookies:
@@ -76,12 +74,18 @@ class SessionManager:
             )
 
         try:
-            session = db.query(Session).get(session_id)
+            session: Session = db.query(Session).get(session_id)
             assert session is not None
         except:
             raise HTTPUnauthorized(
                 title="Invalid token", description="Invalid session ID"
             )
+
+        try:
+            assert session.last_used > datetime.now() - timedelta(weeks=1)
+            assert session.created > datetime.now() - timedelta(weeks=12)
+        except AssertionError:
+            raise HTTPUnauthorized(description="Session has expired.")
 
         try:
 
@@ -94,6 +98,11 @@ class SessionManager:
             raise HTTPUnauthorized(
                 title="Invalid token", description="Session mismatch"
             )
+
+        if req.method == "OPTIONS":
+            return
+
+        self.__validate_hash(session_id, client_hash, resp)
 
         request = Request()
         request.session = session
@@ -110,8 +119,6 @@ class SessionManager:
 
         req.context.user = session.user
         request.user = session.user
-
-        self.__validate_hash(session_id, client_hash, resp)
 
         db.commit()
 

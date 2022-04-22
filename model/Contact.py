@@ -93,6 +93,7 @@ class Contact(Model):
                 "email_addresses",
                 "phone_numbers",
                 "consents",
+                "positions",
             ],
             custom_fields={"addresses": self.address_list},
         )
@@ -130,7 +131,7 @@ class Contact(Model):
                 addr["uprn"] = a.uprn
                 addr["address"] = a.address.single_line
 
-            addr["tenure"] = str(a.tenure)
+            addr["tenure"] = str(a.tenure.value)
             addr["current_residence"] = self.lives_at == a.id
             addrs.append(addr)
 
@@ -265,8 +266,8 @@ class ContactAddress(Model):
     __tablename__ = "contact_addresses"
 
     class Tenure(Enum):
-        RENT_SOCIAL = "private rented"
-        RENT_PRIVATE = "social housing"
+        RENT_SOCIAL = "renting (social)"
+        RENT_PRIVATE = "renting (private)"
         LODGER = "living with landlord"
         LICENSEE = "licensee"
         OCCUPIER = "non-legal occupier"

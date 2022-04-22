@@ -46,7 +46,7 @@ class Branch(Model):
             pcds.append(a.postcode)
         return Schema(
             self,
-            ["id", "abbreviation", "name", "officers", "formal_name"],
+            ["id", "abbreviation", "name", "officers", "formal_name", "officers"],
             custom_fields={"postcodes": pcds},
         )
 
@@ -98,14 +98,11 @@ class Roles(Model):
     contact_id = Column(
         Integer,
         ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE"),
+        primary_key=True,
     )
     title = Column(String, nullable=False)
     type = Column(EnumColumn(RoleTypes), nullable=False)
-    contact_id = Column(
-        Integer,
-        ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE"),
-        primary_key=True,
-    )
+
     unit_type = Column(EnumColumn(UnitTypes), nullable=False)
     branch_id = Column(
         Integer,
@@ -117,13 +114,12 @@ class Roles(Model):
         ForeignKey("committees.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=True,
     )
-    role_title = Column(String(255), nullable=True)
     held_since = Column(Date, default=datetime.now())
     ends_on = Column(Date, default=datetime.now() + timedelta(weeks=52))
 
     branch = relationship(Branch, backref="officers")
     committee = relationship(Committee, backref="members")
-    contact = relationship("Contact", backref="branches")
+    contact = relationship("Contact", backref="positions")
 
     @property
     def unit(self):
@@ -143,13 +139,13 @@ class Roles(Model):
             self,
             ["id", "role_title"],
             custom_fields={
-                "contact": self.contact.name,
+                "contact": {"id": self.contact.id, "name": self.contact.name},
                 "held_since": self.held_since.isoformat(),
                 "ends_on": self.ends_on.isoformat(),
                 "unit": {
-                    "type": self.unit_type.value,
                     "name": self.unit.name,
                     "id": self.unit.id,
+                    "type": self.unit_type.value,
                 },
             },
         )

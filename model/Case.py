@@ -2,6 +2,7 @@ from datetime import datetime
 
 from sqlalchemy import (
     Column,
+    Date,
     DateTime,
     ForeignKey,
     Integer,
@@ -173,3 +174,25 @@ class CaseAddress(Model):
     )
     case = relationship(Case, backref=backref("addresses", order_by=_created_on))
     address = relationship("Address", backref="cases")
+
+
+class Incident(Model):
+
+    __tablename__ = "incidents"
+
+    date = Column(Date, primary_key=True)
+    reference = Column(Integer, primary_key=True)
+    details = Column(Text)
+
+    _reported_by = Column(
+        Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="SET NULL")
+    )
+
+    reported_by = relationship(
+        "Contact", backref="case_address_added", foreign_keys=[_reported_by]
+    )
+
+    def __init__(self, date=datetime.now()) -> None:
+        self.date = date
+        count = db.query(Incident).filter(Incident == self.date).count()
+        self.reference = count + 1
