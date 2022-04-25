@@ -42,11 +42,27 @@ class Contact(Model):
     # Contact
     prefered_email = Column(String(1024), ForeignKey("contact_emails.address"))
     prefered_phone = Column(String(15), ForeignKey("contact_numbers.number"))
-    lives_at = Column(BigInteger, ForeignKey("contact_addresses.id"))
+    lives_at = Column(
+        BigInteger,
+        ForeignKey("contact_addresses.id", ondelete="SET NULL", onupdate="CASCADE"),
+    )
 
     # Account
     password_hash = Column(String(255), nullable=True)
     account_blocked = Column(Boolean, nullable=False, default=False)
+
+    # Branch relationship
+    branch = relationship(
+        "Branch",
+        backref="contacts",
+        primaryjoin="and_(Contact.lives_at == foreign(ContactAddress.id), Contact.membership_number != None)",
+        secondary=(
+            "join(ContactAddress, Address, ContactAddress.uprn == Address.uprn)"
+        ),
+        secondaryjoin="Address.branch_id == foreign(Branch.id)",
+        uselist=False,
+        viewonly=True,
+    )
 
     @property
     def postcode(self):
@@ -81,6 +97,13 @@ class Contact(Model):
                 return False
 
     def __schema__(self):
+        cf = {
+            "addresses": self.address_list,
+        }
+
+        if self.branch is not None:
+            cf["branch"] = {"id": self.branch.id, "name": self.branch.formal_name}
+
         return Schema(
             self,
             [
@@ -95,7 +118,7 @@ class Contact(Model):
                 "consents",
                 "positions",
             ],
-            custom_fields={"addresses": self.address_list},
+            custom_fields=cf,
         )
 
     @property
@@ -131,8 +154,10 @@ class Contact(Model):
                 addr["uprn"] = a.uprn
                 addr["address"] = a.address.single_line
 
-            addr["tenure"] = str(a.tenure.value)
+            if a.tenure is not None:
+                addr["tenure"] = str(a.tenure.value)
             addr["current_residence"] = self.lives_at == a.id
+            addr["id"] = a.id
             addrs.append(addr)
 
         return addrs

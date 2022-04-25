@@ -481,12 +481,11 @@ class AddressResource:
         contact.lives_at = ca.id
         self.session.commit()
 
-    def on_delete(self, req, resp, id):
+    def on_delete_single(self, req, resp, id, address_id):
         """
         Set an address to inactive
         """
 
-        body = req.get_media()
         contact = self.session.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound("Contact not found")
@@ -494,38 +493,10 @@ class AddressResource:
         if not contact.view_guard(req.context.user):
             raise HTTPForbidden
 
-        if "uprn" not in body and "address" not in body:
-            raise HTTPBadRequest(
-                description="You must include EITHER a custom address string, or an address UPRN."
-            )
-
-        ca = self.__get_contact_address(contact, body)
-        if ca is None:
+        ca: ContactAddress = self.session.query(ContactAddress).get(address_id)
+        if ca is None or ca.contact_id != int(id):
             raise HTTPNotFound(description="Address not found")
 
-        ca.active = False
-
-        self.session.commit()
+        self.session.delete(ca)
 
         resp.status = HTTP_204
-
-    def __get_contact_address(self, contact: Contact, body) -> ContactAddress:
-        address = None
-
-        if "uprn" in body:
-            address: ContactAddress = (
-                self.session.query(ContactAddress)
-                .filter(ContactAddress.contact_id == contact.id)
-                .filter(ContactAddress.uprn == body["uprn"])
-                .first()
-            )
-
-        elif "address" in body:
-            address: ContactAddress = (
-                self.session.query(ContactAddress)
-                .filter(ContactAddress.contact_id == contact.id)
-                .filter(ContactAddress.custom_address == body["address"])
-                .first()
-            )
-
-        return address

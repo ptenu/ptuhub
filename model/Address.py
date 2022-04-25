@@ -1,14 +1,14 @@
 from enum import Enum
 
 from services.permissions import trusted_user, user_has_role
-from sqlalchemy import BigInteger, Boolean, Column, Date
+from sqlalchemy import BigInteger, Boolean, Column, Date, text
 from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import Float, ForeignKey, Integer, String, Text
-from sqlalchemy.orm import backref, relationship
-from sqlalchemy.sql.expression import func
+from sqlalchemy.orm import backref, relationship, column_property
+from sqlalchemy.sql.expression import func, select
 
 from model import Model, db
-from model.Organisation import Branch, BranchArea
+from model.Organisation import BranchArea, Branch
 
 from .Schema import Schema
 
@@ -56,6 +56,14 @@ class Address(Model):
         String(length=6), ForeignKey("classifications.code", ondelete="CASCADE")
     )
 
+    branch_id = column_property(
+        select([BranchArea.branch_id.label("branch_id")])
+        .where(text("addresses.postcode LIKE branch_areas.postcode || '%'"))
+        .order_by(func.length(BranchArea.postcode).desc())
+        .limit(1)
+        .as_scalar()
+    )
+
     # Relationships
     contacts = relationship("ContactAddress", backref="address")
     street = relationship("Street", back_populates="addresses", cascade="all")
@@ -64,6 +72,10 @@ class Address(Model):
         "Address", remote_side=[parent_uprn], back_populates="parent"
     )
     classification = relationship("Classification", back_populates="addresses")
+
+    @property
+    def branch(self):
+        return db.query(Branch).get(self.branch_id)
 
     def __init__(self, uprn):
         self.uprn = uprn
@@ -85,7 +97,7 @@ class Address(Model):
                 "coordinates": [self.latitude, self.longitude],
                 "classification": f"({self.classification_code}) {self.classification.class_desc}",
                 "street_id": self.usrn,
-                "branch": self.branch.formal_name,
+                "branch": {"id": self.branch.id, "name": self.branch.formal_name},
             },
         )
 
@@ -202,20 +214,6 @@ class Address(Model):
         address.append(self.postcode)
 
         return address
-
-    @property
-    def branch(self):
-        filter_func = func.substr(self.postcode, 1, func.length(BranchArea.postcode))
-        area: BranchArea = (
-            db.query(BranchArea)
-            .filter(BranchArea.postcode == filter_func)
-            .order_by(func.length(BranchArea.postcode).desc())
-        ).first()
-
-        if area is None:
-            return None
-
-        return area.branch
 
 
 class Street(Model):

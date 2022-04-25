@@ -2,6 +2,7 @@ from os import name
 from model import db
 from model.Contact import Contact, EmailAddress
 from passlib.hash import argon2
+from services.stripe import import_customers
 
 
 def create_contact(given_name: str, family_name: str, email: str):
@@ -28,3 +29,7 @@ def set_password(contact_id: int, password: str):
     contact.password_hash = argon2.hash(password)
     db.commit()
     return True
+
+
+def import_from_stripe():
+    return import_customers()

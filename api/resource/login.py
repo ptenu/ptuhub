@@ -1,13 +1,8 @@
-from datetime import datetime, timedelta
-
-import api.middleware.authentication as auth
-import falcon
-import jwt
-from cryptography.hazmat.primitives import serialization
 from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPForbidden, HTTPNotFound, HTTPUnauthorized
 from model.Contact import Contact
 from passlib.hash import argon2
+from services.permissions import InvalidPermissionError, user_has_role
 from settings import config
 
 
@@ -28,7 +23,8 @@ class PasswordResource:
             raise HTTPUnauthorized
 
         try:
-            new_password = req.media.password
+            body = req.get_media()
+            new_password = body["password"]
         except KeyError:
             raise HTTPBadRequest(description="You must provide a new password.")
 
@@ -36,18 +32,23 @@ class PasswordResource:
 
         resp.status = HTTP_204
 
-    @falcon.before(auth.EnforceRoles, ["global.admin"])
     def on_put_contact(self, req, resp, contact_id):
         """
         Change a specified contact's password
         """
+
+        try:
+            user_has_role(req.context.user, "global.admin")
+        except InvalidPermissionError:
+            raise HTTPForbidden
 
         contact = self.session.query(Contact).get(contact_id)
         if contact is None:
             raise HTTPNotFound
 
         try:
-            new_password = req.media["password"]
+            body = req.get_media()
+            new_password = body["password"]
         except KeyError:
             raise HTTPBadRequest(description="You must provide a new password.")
 

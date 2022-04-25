@@ -53,6 +53,11 @@ class Routes:
         )
         app.add_route("/verify", contacts.ContactsResource(), suffix="verify")
         app.add_route("/contacts/{id}/address", contacts.AddressResource())
+        app.add_route(
+            "/contacts/{id}/address/{address_id}",
+            contacts.AddressResource(),
+            suffix="single",
+        )
 
         # Address
         app.add_route("/addresses", address.AddressResource())

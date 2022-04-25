@@ -31,9 +31,6 @@ class Branch(Model):
     name = Column(String(255), nullable=False, unique=True)
     abbreviation = Column(String(2), nullable=False, unique=True)
 
-    # def get_members(self):
-    #     return services.organisation.get_branch_members(self)
-
     def view_guard(self, user):
         try:
             trusted_user(user)
@@ -46,8 +43,15 @@ class Branch(Model):
             pcds.append(a.postcode)
         return Schema(
             self,
-            ["id", "abbreviation", "name", "officers", "formal_name", "officers"],
-            custom_fields={"postcodes": pcds},
+            [
+                "id",
+                "abbreviation",
+                "name",
+                "officers",
+                "formal_name",
+                "officers",
+            ],
+            custom_fields={"postcodes": pcds, "members": len(self.contacts)},
         )
 
     @property
@@ -66,6 +70,23 @@ class BranchArea(Model):
     postcode = Column(String(8), nullable=False)
 
     branch = relationship(Branch, backref="areas")
+
+    addresses = relationship(
+        "Address",
+        backref="branch_areas",
+        primaryjoin="Address.postcode.like(BranchArea.postcode + '%')",
+        foreign_keys="Address.postcode",
+        viewonly=True,
+    )
+
+    def view_guard(self, user):
+        return True
+
+    def __schema__(self):
+        return Schema(
+            self,
+            ["branch_id", "postcode"],
+        )
 
 
 class Committee(Model):

@@ -16,13 +16,18 @@ class BranchResource:
         branches = self.session.query(Branch).all()
 
         resp.context.media = branches
-        resp.context.fields = [
-            "id",
-            "abbreviation",
-            "name",
-            "postcodes",
-            "formal_name",
-        ]
+        resp.context.fields = ["id", "formal_name", "members"]
+
+    def on_get_single(self, req, resp, branch_id):
+        """
+        Get a branch
+        """
+
+        branch: Branch = self.session.query(Branch).get(branch_id)
+        if branch is None:
+            raise HTTPNotFound
+
+        resp.context.media = branch
 
     def on_post(self, req, resp):
         """

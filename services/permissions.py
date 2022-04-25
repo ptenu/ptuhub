@@ -3,26 +3,25 @@ class InvalidPermissionError(Exception):
 
 
 def has_all(*args):
-    try:
-        for a in args:
-            result = a()
-        return result != False
-
-    except InvalidPermissionError:
-        return False
+    pass
 
 
 def has_one(*args):
-    found = False
-    for a in args:
-        try:
-            result = a()
-            if result != False:
-                found = True
-        except InvalidPermissionError:
-            continue
+    pass
 
-    return found
+
+def e2b(func, *args, **kwargs):
+    """
+    Error to bool - Calls a function within a try loop which
+    catches InvalidPermissionErrors and returns a boolean value
+    which represents whether the permission is valid or not.
+    """
+
+    try:
+        func(*args, **kwargs)
+        return True
+    except InvalidPermissionError:
+        return False
 
 
 def trusted_user(user):

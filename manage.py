@@ -1,5 +1,5 @@
 import click
-from cli.contacts import create_contact, set_password
+from cli.contacts import create_contact, set_password, import_from_stripe
 from cli import address
 from model.File import File
 
@@ -22,6 +22,15 @@ def import_addr():
     click.echo(click.style("Download complete", fg="green"))
     click.echo("Importing (this may take a while!")
     address.do_import()
+
+
+@cli.command()
+def stripe_import():
+    click.echo("Importing Stripe.com customers...")
+    imported, skipped = import_from_stripe()
+    click.echo("Done")
+    click.echo(f"Imported:     {str(imported)}")
+    click.echo(f"Skipped:      {str(skipped)}")
 
 
 @cli.command()

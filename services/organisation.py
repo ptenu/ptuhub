@@ -17,5 +17,5 @@ def get_branch_members(branch):
         .limit(1)
         .subquery()
     )
-    contacts = db.query(Contact).filter(subquery == branch.id).cte()
+    contacts = db.query(Contact).join(subquery).filter(Branch.id == branch.id).cte()
     return contacts
