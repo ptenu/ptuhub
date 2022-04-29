@@ -24,12 +24,18 @@ class ContactsResource:
         """
         Get a list of contacts
         """
-        contacts = (
-            self.session.query(Contact).order_by(Contact._created_on.desc()).all()
-        )
+        contacts_qry = self.session.query(Contact)
+
+        contacts = contacts_qry.order_by(Contact.family_name).limit(15).all()
 
         resp.context.media = contacts
-        resp.context.fields = ["id", "name"]
+        resp.context.fields = [
+            "id",
+            "name",
+            "legal_name",
+            "membership_number",
+            "avatar_url",
+        ]
 
     def on_post_collection(self, req, resp):
         """

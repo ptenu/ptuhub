@@ -1,10 +1,12 @@
 from configparser import Error
+from datetime import datetime
 from re import L
 from string import ascii_uppercase
 import random
 from sqlalchemy import or_
 
 from stripe.api_resources import customer, subscription
+from model.Subscription import Membership, Payment
 import settings
 import stripe
 from falcon import HTTPInternalServerError
@@ -12,6 +14,7 @@ from model import db
 from model.Address import Address
 from model.Contact import Contact, ContactAddress, EmailAddress, TelephoneNumber
 from operator import itemgetter
+import click
 
 STRIPE_KEY = settings.config["stripe"].get("stripe_priv_key")
 stripe.api_key = STRIPE_KEY
@@ -69,6 +72,8 @@ def import_customers():
             db.add(contact)
             db.commit()
 
+        click.echo(f"Processing: {contact.name}")
+
         if contact.prefered_email is None:
             email = EmailAddress(contact, c.email)
             db.add(email)
@@ -105,11 +110,40 @@ def import_customers():
         new_addr = ContactAddress()
         new_addr.contact = contact
 
+        charges = stripe.Charge.list(customer=c.id, limit=100)
+        if len(charges.data) > 0:
+            charge = charges.data[0]
+            contact.membership_rate = charge.amount
+            join_date = charges.data[-1].created
+            contact.joined_on = datetime.fromtimestamp(join_date)
+
+            for ch in charges.data:
+                p = Payment()
+                p.contact = contact
+                p.amount = ch.amount
+                p.created_on = datetime.fromtimestamp(ch.created)
+                p.status = ch.status
+                p.stripe_charge_id = ch.id
+                p.type = p.Types.SUBS
+                contact.stripe_payment_method_id = ch.payment_method
+                p.method_type = ch.payment_method_details.type
+                p.method_last4 = ch.payment_method_details[p.method_type].last4
+                db.add(p)
+                db.commit()
+
+                m = Membership(contact, p.created_on)
+                m.status = Membership.Statuses.PAID
+                m.payment = p
+                db.add(m)
+                db.commit()
+
         if "initial_membership_type" in c.metadata:
             if c.metadata.initial_membership_type == "STANDARD":
                 new_addr.tenure = ContactAddress.Tenure.RENT_PRIVATE
+                contact.membership_type = 1
             else:
                 new_addr.tenure = ContactAddress.Tenure.OCCUPIER
+                contact.membership_rate = 0
 
         if address is not None:
             new_addr.uprn = address.uprn

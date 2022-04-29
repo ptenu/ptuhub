@@ -61,7 +61,7 @@ class Request(Model):
     finished = Column(TIMESTAMP, default=None, nullable=True)
     duration = Column(FLOAT(8, True, 6), nullable=True)
     session_id = Column(
-        UUID, ForeignKey("csrf_sessions.id", ondelete="CASCADE"), nullable=False
+        UUID, ForeignKey("csrf_sessions.id", ondelete="CASCADE"), nullable=True
     )
     host = Column(VARCHAR(256))
     path = Column(VARCHAR(1024))

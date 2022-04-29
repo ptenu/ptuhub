@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 
 class SQLAlchemySessionManager:
     def __init__(self, session: Session):
-        self.Session = session
+        self.Session: Session = session
 
     def process_resource(self, req, resp, resource, params):
         resource.session = self.Session

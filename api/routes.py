@@ -63,6 +63,9 @@ class Routes:
         app.add_route("/addresses", address.AddressResource())
         app.add_route("/addresses/{uprn}", address.AddressResource(), suffix="single")
         app.add_route(
+            "/addresses/{uprn}/notes", address.AddressResource(), suffix="notes"
+        )
+        app.add_route(
             "/addresses/{uprn}/notes/{id}", address.AddressResource(), suffix="note"
         )
         app.add_route(

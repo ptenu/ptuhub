@@ -2,6 +2,7 @@ from falcon import HTTP_201, HTTP_204
 from falcon.errors import HTTPBadRequest, HTTPForbidden, HTTPNotFound, HTTPUnauthorized
 from model.Contact import Contact
 from passlib.hash import argon2
+from password_strength import PasswordPolicy
 from services.permissions import InvalidPermissionError, user_has_role
 from settings import config
 
@@ -11,6 +12,14 @@ class PasswordResource:
         """
         Change a contact password
         """
+        policy = PasswordPolicy.from_names(
+            length=8, uppercase=1, numbers=2, special=1, strength=0.33
+        )
+
+        password_test = policy.test(new_password)
+        if len(password_test) > 0:
+            raise HTTPBadRequest(description="Please chose a stronger password")
+
         contact.password_hash = argon2.hash(new_password)
         self.session.commit()
 
@@ -31,6 +40,7 @@ class PasswordResource:
         self.change_password(req.context.user, new_password)
 
         resp.status = HTTP_204
+        resp.context.clear_sessions = True
 
     def on_put_contact(self, req, resp, contact_id):
         """

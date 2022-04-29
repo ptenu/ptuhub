@@ -73,6 +73,22 @@ class Address(Model):
     )
     classification = relationship("Classification", back_populates="addresses")
 
+    boundaries = relationship(
+        "Boundary",
+        backref="addresses",
+        secondary="postcodes",
+        primaryjoin="Address.postcode == foreign(Postcode.pcds)",
+        secondaryjoin="foreign(Boundary.code.in_((Postcode.e05, "
+        + "Postcode.e06, "
+        + "Postcode.e07, "
+        + "Postcode.e10, "
+        + "Postcode.e14, "
+        + "Postcode.e47, "
+        + "Postcode.e58)))",
+        order_by="Boundary.code.desc()",
+        viewonly=True,
+    )
+
     @property
     def branch(self):
         return db.query(Branch).get(self.branch_id)
@@ -92,6 +108,7 @@ class Address(Model):
                 "notes",
                 "multi_occupancy",
                 "survey_returns",
+                "boundaries",
             ],
             custom_fields={
                 "coordinates": [self.latitude, self.longitude],
@@ -350,6 +367,12 @@ class Boundary(Model):
     @property
     def type(self):
         return self.TYPES[self.code[:3]]
+
+    def view_guard(self, user):
+        return True
+
+    def __schema__(self):
+        return Schema(self, ["name", "type"])
 
 
 class Postcode(Model):

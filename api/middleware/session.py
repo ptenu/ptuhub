@@ -147,3 +147,16 @@ class SessionManager:
         resp.set_header("X-Client-Id", client_hash)
         resp.set_header("Access-Control-Expose-Headers", "X-Client-Id, X-Dev-Message")
         db.commit()
+
+        if "clear_sessions" in resp.context:
+            if resp.context.clear_sessions == False:
+                return
+
+            sessions = (
+                db.query(Session)
+                .filter(Session.contact_id == req.context.user.id)
+                .all()
+            )
+            for s in sessions:
+                db.delete(s)
+                db.commit()

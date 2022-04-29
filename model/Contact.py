@@ -1,3 +1,4 @@
+from email.policy import default
 import json
 from datetime import datetime, timedelta
 from enum import Enum
@@ -5,7 +6,7 @@ from typing import Dict
 from model.Schema import Schema
 
 from services.files import FileService
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, null
 from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship, backref
@@ -36,8 +37,10 @@ class Contact(Model):
     # Membership
     membership_number = Column(String(15))
     joined_on = Column(Date)
-    membership_type = Column(String(1), default="S")
+    membership_type = Column(Integer, nullable=True, default=0)
     stripe_customer_id = Column(String(52))
+    stripe_payment_method_id = Column(String(52))
+    membership_rate = Column(Integer, nullable=True)
 
     # Contact
     prefered_email = Column(String(1024), ForeignKey("contact_emails.address"))
@@ -63,16 +66,6 @@ class Contact(Model):
         uselist=False,
         viewonly=True,
     )
-
-    @property
-    def postcode(self):
-        if self.address is None:
-            return None
-
-        if self.address.uprn is None:
-            return None
-
-        return self.address.address.postcode
 
     # Relationships
     email = relationship(
@@ -104,11 +97,15 @@ class Contact(Model):
         if self.branch is not None:
             cf["branch"] = {"id": self.branch.id, "name": self.branch.formal_name}
 
+        if self.avatar is not None:
+            cf["avatar_url"] = self.avatar.public_url
+
         return Schema(
             self,
             [
                 "id",
                 "name",
+                "legal_name",
                 "membership_number",
                 "first_language",
                 "pronouns",
@@ -138,6 +135,16 @@ class Contact(Model):
         if self.other_names is not None:
             name += " " + self.other_names.capitalize()
         return name
+
+    @property
+    def postcode(self):
+        if self.address is None:
+            return None
+
+        if self.address.uprn is None:
+            return None
+
+        return self.address.address.postcode
 
     @property
     def address_list(self):

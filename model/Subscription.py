@@ -1,3 +1,4 @@
+from email.policy import default
 import uuid
 from datetime import date, datetime, timedelta
 from enum import Enum
@@ -70,6 +71,14 @@ class Membership(Model):
 
     __tablename__ = "memberships"
 
+    class Statuses(Enum):
+        PENDING = "pending"
+        UNPAID = "unpaid"
+        PAID = "paid"
+        SUSPENDED = "suspended"
+        REJECTED = "rejected"
+        CANCELLED = "cancelled"
+
     id = Column(Integer, primary_key=True)
     contact_id = Column(
         Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
@@ -78,7 +87,11 @@ class Membership(Model):
     period_end = Column(Date, nullable=False)
     month = Column(Integer, nullable=False)
     year = Column(Integer, nullable=False)
-    status = Column(String(20), default="pending")
+    status = Column(
+        EnumColumn(Statuses, name="membership_statuses"),
+        nullable=False,
+        default=Statuses.PENDING,
+    )
     payment_id = Column(
         Integer, ForeignKey("payments.id", ondelete="SET NULL", onupdate="CASCADE")
     )
@@ -106,7 +119,6 @@ class MembershipCard(Model):
         Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
     )
     date = Column(Date, default=datetime.today())
-    barcode_img_id = Column(String(10), ForeignKey("files.id"))
     status = Column(String(10), default="generated")
 
     contact = relationship("Contact", backref="membership_cards")
@@ -119,3 +131,17 @@ class MembershipCard(Model):
         name = self.contact.family_name[:4].upper()
         urn = self.contact.membership_number
         return f"{str(self.date.month).zfill(3)}{name}{self.date.year}{urn}0"
+
+
+class Donation(Model):
+
+    __tablename__ = "donations"
+
+    id = Column(Integer, primary_key=True)
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", ondelete="CASCADE", onupdate="CASCADE")
+    )
+    amount = Column(Integer, nullable=False, default=500)
+    frequency = Column(Integer, nullable=False, default=1)
+
+    contact = relationship("Contact", backref="donations")
