@@ -92,29 +92,3 @@ class Request(Model):
         h = blake3(random, key=bytes(SK, "utf-8"))
         self.return_hash = h.hexdigest()
         return self.return_hash
-
-
-class ChallengeSet(Model):
-    __tablename__ = "challenges"
-
-    token = Column(VARCHAR(64), primary_key=True)
-    contact_id = Column(
-        INTEGER, ForeignKey("contacts.id", ondelete="CASCADE"), nullable=True
-    )
-    created_on = Column(TIMESTAMP, default=func.now())
-    last4 = Column(VARCHAR(4), default=None)
-    sms = Column(BOOLEAN, default=False)
-    email = Column(BOOLEAN, default=False)
-
-    contact = relationship("Contact", backref="challenges")
-
-    def __init__(self, contact, last4=None, sms=False, email=False) -> None:
-        self.contact = contact
-
-        self.sms = sms
-        self.email = email
-        self.last4 = last4
-
-        random = secrets.token_bytes(32)
-        h = blake3(random, key=bytes(SK, "utf-8"))
-        self.token = h.hexdigest()

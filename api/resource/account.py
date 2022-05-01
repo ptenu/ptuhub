@@ -3,10 +3,14 @@ Account API: This resource is for enable users to set up/recover their accounts 
              they have never logged on before.
 """
 
-from falcon import HTTPForbidden, HTTPBadRequest
+from random import choice
+from falcon import HTTPForbidden, HTTPBadRequest, HTTP_204
 from model import db
-from model.Contact import Contact, EmailAddress
+from model.Contact import Contact, EmailAddress, TelephoneNumber
+from model.Session import Session
 from model.Subscription import Payment
+from services.sms import SmsService
+from services.email import EmailService
 
 
 class AccountResource:
@@ -30,7 +34,7 @@ class AccountResource:
 
         contact: Contact = (
             db.query(Contact)
-            .join(Contact.emails)
+            .join(EmailAddress, Contact.id == EmailAddress.contact_id)
             .filter(EmailAddress.address == email)
             .first()
         )
@@ -44,13 +48,90 @@ class AccountResource:
                 description="The details you entered were not recognised."
             )
 
-        challenges = []
-        if contact.postcode is not None:
-            challenges.append("postcode")
+        session: Session = req.context.session
+        session.contact_id = contact.id
+        db.commit()
 
-        last_payment = (
-            db.query(Payment)
-            .filter(Payment.contact_id == contact.id)
-            .order_by(Payment.created_on.desc())
+        phone: TelephoneNumber = (
+            db.query(TelephoneNumber)
+            .filter(
+                TelephoneNumber.contact_id == contact.id,
+                TelephoneNumber.verified == True,
+            )
             .first()
         )
+
+        if phone is not None:
+            sms = SmsService(db)
+            sms.send_verification(phone.number)
+            resp.text = "sms"
+            return
+
+        email: EmailAddress = (
+            db.query(EmailAddress)
+            .filter(
+                EmailAddress.contact_id == contact.id, EmailAddress.verified == True
+            )
+            .first()
+        )
+        if email is None:
+            resp.status = HTTPBadRequest(
+                description="You are unable to use this service. Please contact an administrator."
+            )
+
+        ems = EmailService()
+        ems.send_verification(email.address)
+        resp.text = "email"
+        return
+
+    def on_post_recover(self, req, resp):
+        """
+        Check a verification code and make the session trusted.
+        """
+        body = req.get_media()
+
+        if req.context.user is None:
+            raise HTTPBadRequest()
+
+        contact = req.context.user
+        if contact is None:
+            raise HTTPBadRequest(description="You must complete identification first.")
+
+        if "sms" in body:
+            phone: TelephoneNumber = (
+                db.query(TelephoneNumber)
+                .filter(
+                    TelephoneNumber.contact_id == contact.id,
+                    TelephoneNumber.verified == True,
+                )
+                .first()
+            )
+
+            if phone is None:
+                raise HTTPBadRequest(
+                    description="You are unable to use this service, please contact an administrator."
+                )
+
+            sms = SmsService(db)
+            sms.validate(phone.number, body["sms"])
+
+        if "email" in body:
+            email: EmailAddress = (
+                db.query(EmailAddress)
+                .filter(
+                    EmailAddress.contact_id == contact.id, EmailAddress.verified == True
+                )
+                .first()
+            )
+            if email is None:
+                raise HTTPBadRequest(
+                    description="You are unable to use this service, please contact an administrator."
+                )
+
+            ems = EmailService()
+            ems.validate(email.address, body["email"])
+
+        session: Session = req.context.session
+        session.trusted = True
+        db.commit()
+        resp.status = HTTP_204

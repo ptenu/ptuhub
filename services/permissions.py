@@ -1,3 +1,6 @@
+from model import db
+
+
 class InvalidPermissionError(Exception):
     pass
 
@@ -24,10 +27,13 @@ def e2b(func, *args, **kwargs):
         return False
 
 
-def trusted_user(user):
+def trusted_user(user, session=None):
     try:
         assert user is not None
         assert user.account_blocked != True
+        if session is not None:
+            assert session.trusted
+
     except AssertionError:
         raise InvalidPermissionError
 

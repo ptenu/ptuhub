@@ -5,6 +5,8 @@ import api.resource.content as content
 import api.resource.address as address
 import api.resource.session as session
 import api.resource.organisation as org
+import api.resource.account as account
+import api.resource.membership as membership
 
 
 class Routes:
@@ -22,6 +24,8 @@ class Routes:
         app.add_route(
             "/password/{contact_id}", login.PasswordResource(), suffix="contact"
         )
+        app.add_route("/account/identify", account.AccountResource(), suffix="identify")
+        app.add_route("/account/recover", account.AccountResource(), suffix="recover")
 
         # Contacts
         app.add_route("/contacts", contacts.ContactsResource(), suffix="collection")
@@ -58,6 +62,9 @@ class Routes:
             contacts.AddressResource(),
             suffix="single",
         )
+
+        # Membership
+        app.add_route("/membership/{contact_id}", membership.MembershipResource())
 
         # Address
         app.add_route("/addresses", address.AddressResource())

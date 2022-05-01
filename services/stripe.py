@@ -1,25 +1,31 @@
-from configparser import Error
-from datetime import datetime
-from re import L
-from string import ascii_uppercase
 import random
-from sqlalchemy import or_
+from datetime import datetime
+from string import ascii_uppercase
 
-from stripe.api_resources import customer, subscription
-from model.Subscription import Membership, Payment
+import click
 import settings
-import stripe
 from falcon import HTTPInternalServerError
 from model import db
 from model.Address import Address
 from model.Contact import Contact, ContactAddress, EmailAddress, TelephoneNumber
-from operator import itemgetter
-import click
+from model.Subscription import Membership, Payment
+from sqlalchemy import or_
+
+import stripe
 
 STRIPE_KEY = settings.config["stripe"].get("stripe_priv_key")
 stripe.api_key = STRIPE_KEY
 
 UK_COUNTRY_CODE = "GB"
+
+
+def get_payment_method(payment_method_id):
+    """
+    Return the details of a payment method
+    """
+
+    method = stripe.PaymentMethod.retrieve(payment_method_id)
+    return method
 
 
 def import_customers():
@@ -232,16 +238,3 @@ def generate_membership_number(contact: Contact):
         membership_number = f"T{id_num}T{rando}"[:11]
 
     return membership_number
-
-
-def create_new_membership(contact: Contact):
-    """
-    Creates a new membership for an existing contact.
-    """
-
-    # Delete existing subscriptions so we don't accidently charge them twice
-    old_subs = stripe.Subscription.list(customer=customer["id"])
-    if len(old_subs) > 0:
-        for s in old_subs.data:
-
-            stripe.Subscription.delete(s["id"])
