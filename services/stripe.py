@@ -79,42 +79,49 @@ def import_customers():
             db.commit()
 
         click.echo(f"Processing: {contact.name}")
+        try:
+            if contact.prefered_email is None:
+                email = EmailAddress(contact, c.email)
+                db.add(email)
+                db.commit()
+                contact.prefered_email = str(email.address).upper()
 
-        if contact.prefered_email is None:
-            email = EmailAddress(contact, c.email)
-            db.add(email)
-            db.commit()
-            contact.prefered_email = str(email.address).upper()
+            numbers = contact.phone_numbers
+            if contact.prefered_phone is None and c.phone is not None:
+                telephone = TelephoneNumber(c.phone)
+                contact.phone_numbers.append(telephone)
+                db.commit()
+                contact.prefered_phone = telephone.number
+        except:
+            db.rollback()
+            click.echo("Unable to import telephone/email (maybe a duplicate?)")
 
-        if contact.prefered_phone is None and c.phone is not None:
-            telephone = TelephoneNumber(c.phone)
-            contact.phone_numbers.append(telephone)
-            db.commit()
-            contact.prefered_phone = telephone.number
-
-        addresses = (
-            db.query(Address).filter(Address.postcode == c.address.postal_code).all()
-        )
-        address = None
-        if len(addresses) > 0:
-            for a in addresses:
-                if a.multiline[0] != c.address.line1:
-                    continue
-                address = a
-
-        prev_addrs = (
-            db.query(ContactAddress)
-            .filter(
-                ContactAddress.contact_id == contact.id,
-                ContactAddress.uprn == address.uprn,
+        try:
+            addresses = (
+                db.query(Address).filter(Address.postcode == c.address.postal_code).all()
             )
-            .all()
-        )
-        for pa in prev_addrs:
-            db.delete(pa)
+            address = None
+            if len(addresses) > 0:
+                for a in addresses:
+                    if a.multiline[0] != c.address.line1:
+                        continue
+                    address = a
 
-        new_addr = ContactAddress()
-        new_addr.contact = contact
+            prev_addrs = (
+                db.query(ContactAddress)
+                .filter(
+                    ContactAddress.contact_id == contact.id,
+                    ContactAddress.uprn == address.uprn,
+                )
+                .all()
+            )
+            for pa in prev_addrs:
+                db.delete(pa)
+
+            new_addr = ContactAddress()
+            new_addr.contact = contact
+        except:
+            click.echo("Unable to import address, maybe a duplicate or no matches found.")
 
         charges = stripe.Charge.list(customer=c.id, limit=100)
         if len(charges.data) > 0:
@@ -154,7 +161,10 @@ def import_customers():
         if address is not None:
             new_addr.uprn = address.uprn
         else:
+            new_addr.custom_address = ""
             for line in c.address:
+                if line is None or c.address[line] is None:
+                    continue
                 new_addr.custom_address += c.address[line]
 
         db.add(new_addr)

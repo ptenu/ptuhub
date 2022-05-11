@@ -61,7 +61,7 @@ def upgrade():
     sa.PrimaryKeyConstraint('event_id', 'contact_id')
     )
     op.drop_table('committee_members')
-    op.drop_table('links')
+    
     op.drop_table('branch_officers')
     # ### end Alembic commands ###
 
@@ -78,13 +78,7 @@ def downgrade():
     sa.ForeignKeyConstraint(['contact_id'], ['contacts.id'], name='branch_officers_contact_id_fkey', onupdate='CASCADE', ondelete='CASCADE'),
     sa.PrimaryKeyConstraint('branch_id', 'contact_id', name='branch_officers_pkey')
     )
-    op.create_table('links',
-    sa.Column('id', sa.VARCHAR(length=10), autoincrement=False, nullable=False),
-    sa.Column('destination', sa.VARCHAR(length=1024), autoincrement=False, nullable=True),
-    sa.Column('created', postgresql.TIMESTAMP(), autoincrement=False, nullable=True),
-    sa.PrimaryKeyConstraint('id', name='links_pkey'),
-    sa.UniqueConstraint('destination', name='links_destination_key')
-    )
+   
     op.create_table('committee_members',
     sa.Column('committee_id', sa.INTEGER(), autoincrement=False, nullable=False),
     sa.Column('contact_id', sa.INTEGER(), autoincrement=False, nullable=False),
