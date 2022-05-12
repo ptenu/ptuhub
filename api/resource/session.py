@@ -40,7 +40,7 @@ class SessionResource:
 
         body = req.get_media()
         session = Session()
-        session.remote_addr = req.remote_addr
+        session.remote_addr = req.access_route[-1]
         session.source = req.host
         session.set_user_agent(req.user_agent)
 
