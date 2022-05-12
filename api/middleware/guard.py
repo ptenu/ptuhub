@@ -38,6 +38,9 @@ class GuardMiddleware:
         if not req_succeeded:
             return
 
+        if req.method == "OPTIONS":
+            return
+
         # Get required data from context, and validate
         contact = req.context.user
 
