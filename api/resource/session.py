@@ -18,12 +18,13 @@ SK = config.get("default", "secret")
 class SessionResource:
     def _get_user_last_session(self, req, contact: Contact):
         h = blake3(bytes(req.user_agent, "utf-8"), key=bytes(SK, "utf-8"))
+        remote_address = req.access_route[-1]
         session = (
             self.session.query(Session)
             .filter(Session.contact_id == contact.id)
             .filter(Session.user_agent_hash == h.hexdigest())
             .filter(Session.source == req.host)
-            .filter(Session.remote_addr == req.remote_addr)
+            .filter(Session.remote_addr == remote_address)
             .order_by(Session.last_used.desc())
             .first()
         )
