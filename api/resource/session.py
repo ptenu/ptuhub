@@ -18,7 +18,7 @@ SK = config.get("default", "secret")
 class SessionResource:
     def _get_user_last_session(self, req, contact: Contact):
         h = blake3(bytes(req.user_agent, "utf-8"), key=bytes(SK, "utf-8"))
-        remote_address = req.access_route[-1]
+        remote_address = req.access_route[0]
         session = (
             self.session.query(Session)
             .filter(Session.contact_id == contact.id)
@@ -40,7 +40,7 @@ class SessionResource:
 
         body = req.get_media()
         session = Session()
-        session.remote_addr = req.access_route[-1]
+        session.remote_addr = req.access_route[0]
         session.source = req.host
         session.set_user_agent(req.user_agent)
 

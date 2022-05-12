@@ -25,7 +25,7 @@ class Session(Model):
 
     user_agent_hash = Column(VARCHAR(64), nullable=False)
     remote_addr = Column(INET, nullable=False)
-    source = Column(VARCHAR(22), nullable=False)
+    source = Column(VARCHAR(1024), nullable=False)
     created = Column(TIMESTAMP, default=func.now())
     last_used = Column(TIMESTAMP, default=func.now(), server_onupdate="now()")
     trusted = Column(BOOLEAN, default=False, nullable=False)
