@@ -1,29 +1,31 @@
-import falcon
+from datetime import datetime
+
+
+import settings
+from blake3 import blake3
 from falcon import HTTP_201, HTTP_204
-from falcon.errors import (
-    HTTPBadRequest,
-    HTTPNotFound,
-    HTTPNotImplemented,
-)
+from falcon.errors import HTTPBadRequest, HTTPNotFound, HTTPNotImplemented
 from model.Contact import Contact
-from model.Session import Session, Request
+from model.Session import Request, Session
 from passlib.hash import argon2
 from settings import config
-from blake3 import blake3
-from datetime import datetime
 
 SK = config.get("default", "secret")
 
 
 class SessionResource:
     def _get_user_last_session(self, req, contact: Contact):
+        source = req.host
+        if req.get_header("Origin") is not None:
+            source = req.get_header("Origin")
+
         h = blake3(bytes(req.user_agent, "utf-8"), key=bytes(SK, "utf-8"))
         remote_address = req.access_route[0]
         session = (
             self.session.query(Session)
             .filter(Session.contact_id == contact.id)
             .filter(Session.user_agent_hash == h.hexdigest())
-            .filter(Session.source == req.host)
+            .filter(Session.source == source)
             .filter(Session.remote_addr == remote_address)
             .order_by(Session.last_used.desc())
             .first()
@@ -36,12 +38,14 @@ class SessionResource:
         Create a session from login details or a refresh token
         """
 
-        tokens = {}
+        source = req.host
+        if req.get_header("Origin") is not None:
+            source = req.get_header("Origin")
 
         body = req.get_media()
         session = Session()
         session.remote_addr = req.access_route[0]
-        session.source = req.host
+        session.source = source
         session.set_user_agent(req.user_agent)
 
         if "endpoint" in body:
@@ -97,4 +101,10 @@ class SessionResource:
 
         self.session.commit()
         resp.media = {"session_id": session.id}
+
+        # ENV = settings.config["default"].get("env")
+        # if ENV.startswith(("dev", "DEV")):
+        #     resp.set_cookie("SESSION_ID", session.id, same_site="None", secure=False)
+        #     return
+
         resp.set_cookie("SESSION_ID", session.id, same_site="None")

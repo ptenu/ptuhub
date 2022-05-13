@@ -53,6 +53,9 @@ class SessionManager:
         request.context object.
         """
 
+        if req.method == "OPTIONS":
+            return
+
         if req.path in NO_VALIDATION_URLS:
             req.context.user = None
             return
@@ -88,19 +91,19 @@ class SessionManager:
             raise HTTPUnauthorized(description="Session has expired.")
 
         try:
+            source = req.host
+            if req.get_header("Origin") is not None:
+                source = req.get_header("Origin")
 
             h = blake3(bytes(req.user_agent, "utf-8"), key=bytes(SK, "utf-8"))
             assert session.remote_addr == req.remote_addr
-            assert session.source == req.host
+            assert session.source == source
             assert session.user_agent_hash == h.hexdigest()
 
         except AssertionError:
             raise HTTPUnauthorized(
                 title="Invalid token", description="Session mismatch"
             )
-
-        if req.method == "OPTIONS":
-            return
 
         self.__validate_hash(session_id, client_hash, resp)
 
@@ -126,6 +129,21 @@ class SessionManager:
         """
         Update the information on the request
         """
+
+        if "Access-Control-Allow-Origin" not in resp.headers:
+            source = req.host
+            if req.get_header("Origin") is not None:
+                source = req.get_header("Origin")
+
+            resp.append_header("Access-Control-Allow-Origin", source)
+            resp.append_header("Access-Control-Allow-Credentials", "true")
+            resp.append_header(
+                "Access-Control-Allow-Methods", "GET,PUT,PATCH,POST,DELETE,OPTIONS"
+            )
+            resp.append_header(
+                "Access-Control-Allow-Headers", "content-type, x-client-id"
+            )
+            resp.append_header("Vary", "Origin")
 
         if req.method == "OPTIONS":
             return

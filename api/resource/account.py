@@ -52,6 +52,20 @@ class AccountResource:
         session.contact_id = contact.id
         db.commit()
 
+        email: EmailAddress = (
+            db.query(EmailAddress)
+            .filter(
+                EmailAddress.contact_id == contact.id, EmailAddress.verified == True
+            )
+            .first()
+        )
+        if email is not None:
+            ems = EmailService()
+            ems.db = db
+            ems.send_verification(email.address)
+            resp.text = "email"
+            return
+
         phone: TelephoneNumber = (
             db.query(TelephoneNumber)
             .filter(
@@ -61,27 +75,13 @@ class AccountResource:
             .first()
         )
 
-        if phone is not None:
-            sms = SmsService(db)
-            sms.send_verification(phone.number)
-            resp.text = "sms"
-            return
-
-        email: EmailAddress = (
-            db.query(EmailAddress)
-            .filter(
-                EmailAddress.contact_id == contact.id, EmailAddress.verified == True
-            )
-            .first()
-        )
-        if email is None:
-            resp.status = HTTPBadRequest(
+        if phone is None:
+            raise HTTPBadRequest(
                 description="You are unable to use this service. Please contact an administrator."
             )
-
-        ems = EmailService()
-        ems.send_verification(email.address)
-        resp.text = "email"
+        sms = SmsService(db)
+        sms.send_verification(phone.number)
+        resp.text = "sms"
         return
 
     def on_post_recover(self, req, resp):
@@ -129,6 +129,7 @@ class AccountResource:
                 )
 
             ems = EmailService()
+            ems.db = db
             ems.validate(email.address, body["email"])
 
         session: Session = req.context.session

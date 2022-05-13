@@ -142,14 +142,14 @@ class EmailService:
 
         token = self.db.query(VerifyToken).get([VerifyToken.Types.EMAIL, email.upper()])
         if token is None:
-            raise HTTPNotFound
+            raise HTTPNotFound(description="The token you tried to use has expired.")
 
         if not argon2.verify(code, token.hash):
             raise HTTPBadRequest(description="Invalid code")
 
         email = self.db.query(EmailAddress).get(email.upper())
         if email is None:
-            raise HTTPNotFound
+            raise HTTPNotFound(description="The token you tried to use has expired.")
 
         email.verified = True
         self.db.delete(token)

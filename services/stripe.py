@@ -86,7 +86,6 @@ def import_customers():
                 db.commit()
                 contact.prefered_email = str(email.address).upper()
 
-            numbers = contact.phone_numbers
             if contact.prefered_phone is None and c.phone is not None:
                 telephone = TelephoneNumber(c.phone)
                 contact.phone_numbers.append(telephone)
@@ -98,7 +97,9 @@ def import_customers():
 
         try:
             addresses = (
-                db.query(Address).filter(Address.postcode == c.address.postal_code).all()
+                db.query(Address)
+                .filter(Address.postcode == c.address.postal_code)
+                .all()
             )
             address = None
             if len(addresses) > 0:
@@ -121,7 +122,9 @@ def import_customers():
             new_addr = ContactAddress()
             new_addr.contact = contact
         except:
-            click.echo("Unable to import address, maybe a duplicate or no matches found.")
+            click.echo(
+                "Unable to import address, maybe a duplicate or no matches found."
+            )
 
         charges = stripe.Charge.list(customer=c.id, limit=100)
         if len(charges.data) > 0:

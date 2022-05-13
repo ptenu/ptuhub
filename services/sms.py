@@ -85,14 +85,14 @@ class SmsService:
 
         token = self.db.query(VerifyToken).get([VerifyToken.Types.PHONE, number])
         if token is None:
-            raise HTTPNotFound
+            raise HTTPNotFound(description="The token you tried to use has expired.")
 
         if not argon2.verify(code, token.hash):
             raise HTTPBadRequest(description="Invalid code")
 
         tel = self.db.query(TelephoneNumber).get(number)
         if tel is None:
-            raise HTTPNotFound
+            raise HTTPNotFound(description="The token you tried to use has expired.")
 
         tel.verified = True
         self.db.delete(token)
