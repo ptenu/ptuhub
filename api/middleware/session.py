@@ -96,6 +96,13 @@ class SessionManager:
                 source = req.get_header("Origin")
 
             h = blake3(bytes(req.user_agent, "utf-8"), key=bytes(SK, "utf-8"))
+
+            # Forgive me this tresspass, as I would forgive your trespasses
+            # Live 'testing'
+            print(f"Remote Address: {session.remote_addr} == {req.remote_addr}")
+            print(f"{session.source} == {source}")
+            print(f"{session.user_agent_hash} == {h.hexdigest()}")
+
             assert session.remote_addr == req.remote_addr
             assert session.source == source
             assert session.user_agent_hash == h.hexdigest()
