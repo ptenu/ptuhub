@@ -83,7 +83,13 @@ class AddressResource:
             .all()
         )
         resp.context.media = addr
-        resp.context.fields = ["uprn", "single_line", "street_id", "classification"]
+        resp.context.fields = [
+            "uprn",
+            "single_line",
+            "street_id",
+            "classification",
+            "last_visit",
+        ]
 
     def on_get_single(self, req, resp, uprn):
         addr = self.session.query(Address).get(uprn)
@@ -166,8 +172,10 @@ class AddressResource:
         if "date" not in input:
             raise HTTPBadRequest(description="You must include a date field.")
 
-        if "added_by" not in input:
-            raise HTTPBadRequest(description="You must include a 'added_by' field.")
+        try:
+            added_by = input["added_by"]
+        except:
+            added_by = req.context.user.id
 
         response = SurveyReturn()
         response.address = addr
@@ -180,7 +188,7 @@ class AddressResource:
                 description="The date you provided was in the wrong format."
             )
 
-        contact = self.session.query(Contact).get(input["added_by"])
+        contact = self.session.query(Contact).get(added_by)
         if contact is None:
             raise HTTPBadRequest(description="Specified user not found.")
         response.added_by = contact
@@ -203,6 +211,12 @@ class AddressResource:
         if "answered" in input:
             if input["answered"] == False:
                 response.answered = False
+
+        if "previously_rented" in input:
+            response.response_2 = str(input["previously_rented"])[0]
+
+        if "hmo" in input:
+            response.response_3 = str(input["hmo"])[0]
 
         self.session.add(response)
         self.session.commit()
@@ -234,6 +248,7 @@ class StreetResource:
         streets = (
             self.session.query(Street)
             .filter(Street.description.like(f"%{query}%"))
+            .filter(Street.households > 0)
             .order_by(Street.description)
             .limit(15)
             .all()

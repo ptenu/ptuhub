@@ -98,6 +98,16 @@ class Address(Model):
 
     @property
     def __schema__(self):
+        last_visit = None
+        if len(self.survey_returns) > 0:
+            last_return = self.survey_returns[0]
+            last_visit = {
+                "date": last_return.date.isoformat(),
+                "visited_by": last_return.added_by.name,
+            }
+
+        returns = self.survey_returns[0:3]
+
         return Schema(
             self,
             [
@@ -107,7 +117,6 @@ class Address(Model):
                 "multiline",
                 "notes",
                 "multi_occupancy",
-                "survey_returns",
                 "boundaries",
             ],
             custom_fields={
@@ -115,6 +124,8 @@ class Address(Model):
                 "classification": f"({self.classification_code}) {self.classification.class_desc}",
                 "street_id": self.usrn,
                 "branch": {"id": self.branch.id, "name": self.branch.formal_name},
+                "last_visit": last_visit,
+                "survey_returns": returns,
             },
         )
 
@@ -259,6 +270,13 @@ class Street(Model):
         Address, back_populates="street", cascade="all, delete-orphan"
     )
 
+    households = column_property(
+        select([func.count(Address.uprn)])
+        .where(Address.classification_code.like("R%"))
+        .where(Address.usrn == usrn)
+        .as_scalar()
+    )
+
     def __init__(self, usrn):
         self.usrn = usrn
 
@@ -269,9 +287,18 @@ class Street(Model):
             return False
 
     def __schema__(self):
+
         return Schema(
             self,
-            ["usrn", "description", "locality", "town", "admin_area"],
+            [
+                "usrn",
+                "description",
+                "locality",
+                "town",
+                "admin_area",
+                "households",
+                "survey_returns",
+            ],
             custom_fields={
                 "surface": self.SURFACES[self.surface_code]
                 if self.surface_code is not None
@@ -444,7 +471,9 @@ class AddressNote(Model):
     withdrawn = Column(Boolean, default=False, nullable=False)
     sensitive = Column(Boolean, default=False, nullable=False)
 
-    address = relationship("Address", backref="notes")
+    address = relationship(
+        "Address", backref=backref("notes", order_by="desc(AddressNote.date)")
+    )
     added_by = relationship("Contact", backref="address_notes")
 
     def view_guard(self, user):
@@ -456,6 +485,9 @@ class AddressNote(Model):
         try:
             user_has_role(user, "global.admin")
         except:
+            if self.sensitive == False:
+                return True
+
             if user.id != self.added_by.id:
                 return False
 
