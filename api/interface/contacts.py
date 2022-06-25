@@ -3,7 +3,6 @@ import tempfile
 from falcon.errors import HTTPBadRequest, HTTPNotFound
 from model import db as Session
 from model.File import File
-from io import BytesIO
 from PIL import Image, UnidentifiedImageError
 from model.Contact import Contact
 from services.files import FileService
@@ -27,7 +26,7 @@ class ContactInterface:
 
         try:
             with Image.open(input_img) as image:
-                image = image.resize((320, 320))
+                image = image.thumbnail((320, 320))
                 image = image.convert("RGB")
                 image.save(output_img, "jpeg")
 

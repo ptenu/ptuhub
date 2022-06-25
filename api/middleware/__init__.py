@@ -13,6 +13,7 @@ ORIGINS = [
     "https://api.peterboroughtenants.app",
     "http://localhost:3333",
     "http://localhost:8000",
+    "http://localhost:1234",
 ]
 
 MIDDLEWARE = [

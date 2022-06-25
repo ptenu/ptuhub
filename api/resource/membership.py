@@ -16,7 +16,7 @@ class MembershipResource:
         Get a contact's membership
         """
 
-        if not e2b(trusted_user, req.context.user, req.context.session):
+        if not e2b(trusted_user, req.context.user):
             raise HTTPForbidden
 
         db: Session = self.session
@@ -25,9 +25,9 @@ class MembershipResource:
         if contact is None:
             raise HTTPNotFound
 
-        if not e2b(user_has_role, req.context.user, "global.admin"):
-            if contact_id != req.context.user.id:
-                raise HTTPForbidden
+        # if not e2b(user_has_role, req.context.user, "global.admin"):
+        #     if contact_id != req.context.user.id:
+        #         raise HTTPForbidden
 
         join_date = None
         if len(contact.memberships) > 0:

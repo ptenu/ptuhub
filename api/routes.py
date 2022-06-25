@@ -1,12 +1,9 @@
-import api.resource.root as root
-import api.resource.contacts as contacts
-import api.resource.login as login
-import api.resource.content as content
 import api.resource.address as address
-import api.resource.session as session
-import api.resource.organisation as org
-import api.resource.account as account
+import api.resource.contacts as contacts
+import api.resource.content as content
 import api.resource.membership as membership
+import api.resource.organisation as org
+import api.resource.root as root
 
 
 class Routes:
@@ -17,15 +14,6 @@ class Routes:
     def __init__(self, app):
 
         app.add_route("/", root.RootResource())
-
-        # Auth
-        app.add_route("/session", session.SessionResource())
-        app.add_route("/password", login.PasswordResource(), suffix="self")
-        app.add_route(
-            "/password/{contact_id}", login.PasswordResource(), suffix="contact"
-        )
-        app.add_route("/account/identify", account.AccountResource(), suffix="identify")
-        app.add_route("/account/recover", account.AccountResource(), suffix="recover")
 
         # Contacts
         app.add_route("/contacts", contacts.ContactsResource(), suffix="collection")

@@ -1,7 +1,6 @@
 from datetime import date, datetime
 from dateutil import relativedelta
-from model.Organisation import Branch, BranchArea, Committee, Roles, RoleTypes
-from model.Contact import Contact
+from model.Organisation import Branch, BranchArea, Committee, Role, RoleTypes
 from services.permissions import InvalidPermissionError, user_has_role
 from falcon.errors import HTTPForbidden, HTTPBadRequest, HTTPNotFound
 from falcon import HTTP_201, HTTP_204
@@ -258,17 +257,17 @@ class RoleResource:
 
         try:
             body = req.get_media()
-            role = Roles()
+            role = Role()
 
             role.contact_id = body["contact_id"]
 
             if "branch_id" in body:
                 role.branch_id = int(body["branch_id"])
-                role.unit_type = Roles.UnitTypes.BRANCH
+                role.unit_type = Role.UnitTypes.BRANCH
 
             if "committee_id" in body:
                 role.committee_id = int(body["committee_id"])
-                role.unit_type = Roles.UnitTypes.COMMITTEE
+                role.unit_type = Role.UnitTypes.COMMITTEE
 
             role.held_since = datetime.now()
             if "term" in body:
@@ -279,8 +278,8 @@ class RoleResource:
             role.type = RoleTypes[type_code]
 
             no_of_members = (
-                self.session.query(Roles)
-                .filter(Roles.contact_id == role.contact_id)
+                self.session.query(Role)
+                .filter(Role.contact_id == role.contact_id)
                 .count()
             )
 
@@ -304,7 +303,7 @@ class RoleResource:
         except InvalidPermissionError:
             raise HTTPForbidden
 
-        role: Roles = self.session.query(Roles).get([role_id, id])
+        role: Role = self.session.query(Role).get([role_id, id])
         if role is None:
             raise HTTPNotFound
 

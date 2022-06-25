@@ -1,4 +1,19 @@
+from datetime import date
 from model import db
+from enum import Enum
+
+
+class RoleTypes(Enum):
+    CHAIR = "chair"
+    SEC = "secretary"
+    TRES = "treasurer"
+    TRUST = "trustee"
+    MEM = "member"
+    DEL = "delegate"
+    REP = "rep"
+    SREP = "senior rep"
+    ORG = "organiser"
+    LREP = "learning rep"
 
 
 class InvalidPermissionError(Exception):
@@ -6,10 +21,6 @@ class InvalidPermissionError(Exception):
 
 
 def has_all(*args):
-    pass
-
-
-def has_one(*args):
     pass
 
 
@@ -27,23 +38,60 @@ def e2b(func, *args, **kwargs):
         return False
 
 
-def trusted_user(user, session=None):
+def user_has_position(
+    contact,
+    role,
+    branch=None,
+    committee=None,
+    union=False,
+):
+    from model.Organisation import Committee, RoleTypes, Role
+
+    if role is None:
+        raise ValueError
+
+    if branch is not None and committee is not None:
+        raise ValueError
+
+    roles = (
+        db.query(Role)
+        .filter(Role.contact_id == contact.id)
+        .filter(Role.held_since < date.today())
+        .filter(Role.ends_on > date.today())
+    )
+
     try:
-        assert user is not None
-        assert user.account_blocked != True
-        if session is not None:
-            assert session.trusted
+        roles_list = iter(role)
+    except TypeError:
+        if not isinstance(role, RoleTypes):
+            raise ValueError
+        roles.filter(Role.type == role)
+    else:
+        roles.filter(Role.type.in_(roles_list))
+
+    if union:
+        roles.join(Role.committee).filter(Committee.access_level == 2)
+
+    if branch is not None:
+        roles.filter(Role.branch_id == branch.id)
+
+    if committee is not None:
+        roles.filter(Role.committee_id == committee.id)
+
+    try:
+        assert roles.count() > 1
+    except AssertionError:
+        raise InvalidPermissionError
+
+
+def trusted_user(contact, *args, **kwargs):
+    try:
+        assert contact is not None
+        assert contact.membership_status == "ACTIVE"
 
     except AssertionError:
         raise InvalidPermissionError
 
 
-def user_has_role(user, role: str):
-    roles = []
-    for r in user.roles:
-        roles.append(r.name)
-
-    try:
-        assert role in roles
-    except AssertionError:
-        raise InvalidPermissionError
+def user_has_role(contact, role):
+    return user_has_position(contact, role)

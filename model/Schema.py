@@ -1,5 +1,6 @@
 from datetime import datetime, date
 import inspect
+import json
 import types
 from model import Model
 
@@ -86,7 +87,15 @@ class Schema:
                 return False
 
         if not hasattr(object, "__schema__"):
-            return object
+            try:
+                value = json.dumps(object)
+                return object
+            except:
+                try:
+                    value = str(object)
+                    return value
+                except:
+                    return False
 
         schema = getattr(object, "__schema__")
         if callable(schema):

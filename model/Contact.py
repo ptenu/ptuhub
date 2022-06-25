@@ -1,19 +1,21 @@
-from email.policy import default
-import json
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from enum import Enum
 from typing import Dict
 from model.Schema import Schema
 
-from services.files import FileService
-from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime, null
+from sqlalchemy import BigInteger, Boolean, Column, Date, DateTime
 from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import Float, ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship, backref
-from sqlalchemy.sql.expression import func
 
 from model import Model
-from services.permissions import trusted_user, user_has_role
+from services.permissions import (
+    RoleTypes,
+    trusted_user,
+    user_has_position,
+    user_has_role,
+)
+from services.organisation import get_membership_status
 
 
 class Contact(Model):
@@ -41,6 +43,7 @@ class Contact(Model):
     stripe_customer_id = Column(String(52))
     stripe_payment_method_id = Column(String(52))
     membership_rate = Column(Integer, nullable=True)
+    payments_paused = Column(Boolean, nullable=False, default=False)
 
     # Contact
     prefered_email = Column(String(1024), ForeignKey("contact_emails.address"))
@@ -49,10 +52,6 @@ class Contact(Model):
         BigInteger,
         ForeignKey("contact_addresses.id", ondelete="SET NULL", onupdate="CASCADE"),
     )
-
-    # Account
-    password_hash = Column(String(255), nullable=True)
-    account_blocked = Column(Boolean, nullable=False, default=False)
 
     # Branch relationship
     branch = relationship(
@@ -81,11 +80,33 @@ class Contact(Model):
             return True
 
         try:
-            user_has_role(user, "global.admin")
+            user_has_position(
+                user,
+                (
+                    RoleTypes.CHAIR,
+                    RoleTypes.SEC,
+                    RoleTypes.REP,
+                    RoleTypes.TRES,
+                    RoleTypes.ORG,
+                ),
+                branch=self.branch,
+            )
             return True
         except:
             try:
-                user_has_role(user, "membership.admin")
+                user_has_position(
+                    user,
+                    (
+                        RoleTypes.CHAIR,
+                        RoleTypes.SEC,
+                        RoleTypes.REP,
+                        RoleTypes.SREP,
+                        RoleTypes.TRES,
+                        RoleTypes.ORG,
+                        RoleTypes.TRUST,
+                    ),
+                    union=True,
+                )
             except:
                 return False
 
@@ -114,6 +135,7 @@ class Contact(Model):
                 "phone_numbers",
                 "consents",
                 "positions",
+                "membership_status",
             ],
             custom_fields=cf,
         )
@@ -169,6 +191,21 @@ class Contact(Model):
 
         return addrs
 
+    @property
+    def membership_status(self):
+        return get_membership_status(self)
+
+
+class UserIdentity(Model):
+    __tablename__ = "identities"
+
+    id = Column(String(512), primary_key=True)
+    contact_id = Column(
+        Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE")
+    )
+
+    contact = relationship(Contact, backref="identities", foreign_keys=[contact_id])
+
 
 class EmailAddress(Model):
 
@@ -192,17 +229,7 @@ class EmailAddress(Model):
         self.address = address.upper()
 
     def view_guard(self, user):
-        if user is not None and user.id == self.contact_id:
-            return True
-
-        try:
-            user_has_role(user, "global.admin")
-            return True
-        except:
-            try:
-                user_has_role(user, "membership.admin")
-            except:
-                return False
+        return self.contact.view_guard(user)
 
     def __schema__(self):
         return Schema(
@@ -271,17 +298,7 @@ class TelephoneNumber(Model):
         self.number = number
 
     def view_guard(self, user):
-        if user is not None and user.id == self.contact_id:
-            return True
-
-        try:
-            user_has_role(user, "global.admin")
-            return True
-        except:
-            try:
-                user_has_role(user, "membership.admin")
-            except:
-                return False
+        return self.contact.view_guard(user)
 
     def __schema__(self):
         return Schema(self, ["number", "description"])
@@ -355,7 +372,7 @@ class Consent(Model):
             return False
 
         try:
-            user_has_role(user, "global.admin")
+            user_has_position(user, RoleTypes.TRUST, union=True)
         except:
             if user.id != self.contact_id:
                 return False
@@ -403,7 +420,11 @@ class Note(Model):
             return False
 
         try:
-            user_has_role(user, "global.admin")
+            user_has_position(
+                user,
+                (RoleTypes.TRUST, RoleTypes.CHAIR, RoleTypes.SREP, RoleTypes.SEC),
+                union=True,
+            )
         except:
             if user.id == self.contact_id or user.id != self._created_by:
                 return False
@@ -434,57 +455,4 @@ class VerifyToken(Model):
         DateTime,
         default=datetime.now() + timedelta(minutes=15),
         onupdate=datetime.now() + timedelta(minutes=15),
-    )
-
-
-class Role(Model):
-
-    __tablename__ = "auth_roles"
-
-    contact_id = Column(
-        Integer,
-        ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    name = Column(String(20), primary_key=True)
-
-    contact = relationship(Contact, backref="roles")
-
-    def view_guard(self, user):
-        try:
-            trusted_user(user)
-            user_has_role(user, "global.admin")
-        except:
-            return False
-
-    @property
-    def __schema__(self):
-        return Schema(self, ["name"])
-
-
-class Availability(Model):
-    __tablename__ = "contact_availability"
-
-    class AvailabilityStatuses(Enum):
-        AVAILABLE = 1
-        OFFLINE = 0
-        EMAR = 999  # EMergency Assistance Req.
-        ASSIGNED = 2
-        BUSY = 3
-        ON_BREAK = 4
-
-    AVS = AvailabilityStatuses
-
-    contact_id = Column(
-        Integer,
-        ForeignKey("contacts.id", onupdate="CASCADE", ondelete="CASCADE"),
-        primary_key=True,
-    )
-    start_time = Column(DateTime, default=func.now(), primary_key=True)
-    status = Column(EnumColumn(AvailabilityStatuses), nullable=False)
-    latitude = Column(Float(precision=8, decimal_return_scale=7), nullable=True)
-    longitude = Column(Float(precision=8, decimal_return_scale=7), nullable=True)
-
-    contact = relationship(
-        Contact, backref=backref("statuses", order_by=start_time.desc())
     )

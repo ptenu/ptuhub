@@ -6,7 +6,10 @@ from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import relationship
 
-from model import Model
+from model import Model, db
+from model.Contact import Contact
+from model.Organisation import Branch, Committee
+from services.permissions import RoleTypes, e2b, trusted_user, user_has_position
 
 
 class EmailMessage(Model):
@@ -28,8 +31,8 @@ class EmailMessage(Model):
     type = Column(String(15), nullable=False, default="transactional")
 
     # Meta
-    _created_on = Column(DateTime, default=datetime.now())
-    _updated_on = Column(DateTime, onupdate=datetime.now())
+    _created_on = Column(DateTime, default="NOW()")
+    _updated_on = Column(DateTime, onupdate="NOW()")
     _created_by = Column(
         Integer, ForeignKey("contacts.id", onupdate="CASCADE", ondelete="SET NULL")
     )
@@ -37,6 +40,10 @@ class EmailMessage(Model):
     created_by = relationship(
         "Contact", backref="sent_emails", foreign_keys=[_created_by]
     )
+
+    def view_guard(self, user):
+        if e2b(trusted_user(user)) == False:
+            return False
 
 
 class EmailRecipient(Model):
@@ -56,6 +63,24 @@ class EmailRecipient(Model):
     recipient_id = Column(Integer, primary_key=True)
 
     email = relationship(EmailMessage, backref="recipients")
+
+    @property
+    def name(self):
+        """
+        Get the name of the recipient.
+        """
+
+        if self.type is self.Types.CONTACT:
+            contact: Contact = db.get(Contact, self.recipient_id)
+            return contact.name
+
+        if self.type is self.Types.BRANCH:
+            branch: Branch = db.get(Branch, self.recipient_id)
+            return branch.formal_name
+
+        if self.type is self.Types.COMMITTEE:
+            committee: Committee = db.get(Committee, self.recipient_id)
+            return committee.name
 
 
 class EmailDelivery(Model):

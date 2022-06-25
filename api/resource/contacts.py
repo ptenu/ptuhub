@@ -15,7 +15,7 @@ from model.Contact import (
     TelephoneNumber,
 )
 from services.email import EmailService
-from services.permissions import user_has_role
+from services.permissions import RoleTypes, trusted_user, user_has_role
 from services.sms import SmsService
 
 
@@ -41,6 +41,8 @@ class ContactsResource:
         """
         Create a new contact
         """
+
+        trusted_user(req.context.user)
 
         # Get paramaters from body
         input = req.get_media()
@@ -139,7 +141,9 @@ class ContactsResource:
         """
 
         try:
-            user_has_role(req.context.user, "global.admin")
+            user_has_role(req.context.user, [RoleTypes.TRUST, RoleTypes.SEC])
+            if not contact.view_guard(req.context.user):
+                raise HTTPForbidden
         except:
             raise HTTPForbidden
 
@@ -444,7 +448,7 @@ class AddressResource:
 
         resp.status = HTTP_204
 
-        contact = self.session.query(Contact).get(id)
+        contact: Contact = self.session.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound(description="Contact not found")
 
@@ -492,7 +496,7 @@ class AddressResource:
         Set an address to inactive
         """
 
-        contact = self.session.query(Contact).get(id)
+        contact: Contact = self.session.query(Contact).get(id)
         if contact is None:
             raise HTTPNotFound("Contact not found")
 

@@ -9,7 +9,7 @@ from sqlalchemy import Enum as EnumColumn
 from sqlalchemy import ForeignKey, Integer, String, Text
 from sqlalchemy.orm import backref, relationship
 from model.Schema import Schema
-from services.permissions import user_has_role
+from services.permissions import RoleTypes, user_has_position, user_has_role
 
 from model import Model
 from model import db
@@ -50,14 +50,26 @@ class Payment(Model):
         if user is None:
             return False
 
-        if (
-            user.id == self.contact_id
-            or user_has_role("global.admin")
-            or user_has_role("membership.admin")
-        ):
+        if user.id == self.contact_id:
             return True
 
-        return False
+        try:
+            user_has_position(
+                user,
+                (RoleTypes.CHAIR, RoleTypes.SEC, RoleTypes.TRUST, RoleTypes.TRES),
+                union=True,
+            )
+            return True
+        except:
+            try:
+                user_has_position(
+                    user,
+                    (RoleTypes.CHAIR, RoleTypes.SEC, RoleTypes.TRES),
+                    branch=self.contact.branch,
+                )
+                return True
+            except:
+                return False
 
     def __schema__(self):
         return Schema(

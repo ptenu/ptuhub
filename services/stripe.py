@@ -71,9 +71,7 @@ def import_customers():
 
         if contact is None:
             contact = Contact()
-            given_name, family_name = str(c.name).split(" ", 1)
-            contact.family_name = family_name
-            contact.given_name = given_name
+            contact.given_name, contact.family_name = str(c.name).split(" ", 1)
 
             db.add(contact)
             db.commit()
@@ -165,10 +163,11 @@ def import_customers():
             new_addr.uprn = address.uprn
         else:
             new_addr.custom_address = ""
-            for line in c.address:
-                if line is None or c.address[line] is None:
-                    continue
-                new_addr.custom_address += c.address[line]
+            new_addr.custom_address += c.address["line1"] + "\n"
+            new_addr.custom_address += c.address["line2"] + "\n"
+            if c.address["line2"] != c.address["city"]:
+                new_addr.custom_address += c.address["city"] + "\n"
+            new_addr.custom_address += c.address["postal_code"]
 
         db.add(new_addr)
         db.commit()
@@ -176,6 +175,8 @@ def import_customers():
 
         contact.stripe_customer_id = c.id
         contact.membership_number = c.metadata.membership_number
+        joined_on = datetime.fromtimestamp(c.created)
+        contact.joined_on = joined_on
 
         db.commit()
         imported += 1

@@ -8,20 +8,7 @@ from sqlalchemy import Enum as EnumColumn
 from sqlalchemy.orm import relationship
 
 from model import Model
-from services.permissions import trusted_user
-
-
-class RoleTypes(Enum):
-    CHAIR = "chair"
-    SEC = "secretary"
-    TRES = "treasurer"
-    TRUST = "trustee"
-    MEM = "member"
-    DEL = "delegate"
-    REP = "rep"
-    SREP = "senior rep"
-    ORG = "organiser"
-    LREP = "learning rep"
+from services.permissions import trusted_user, RoleTypes
 
 
 class Branch(Model):
@@ -96,6 +83,7 @@ class Committee(Model):
     id = Column(Integer, primary_key=True)
     name = Column(String(255), nullable=False, unique=True)
     abbreviation = Column(String(2), nullable=False, unique=True)
+    access_level = Column(Integer, nullable=False, default=0)
 
     def view_guard(self, user):
         try:
@@ -107,7 +95,7 @@ class Committee(Model):
         return Schema(self, ["id", "abbreviation", "name", "members"])
 
 
-class Roles(Model):
+class Role(Model):
 
     __tablename__ = "roles"
 

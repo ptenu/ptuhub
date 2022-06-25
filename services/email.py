@@ -102,7 +102,7 @@ class EmailService:
 
             if r.type is EmailRecipient.Types.BRANCH:
                 branch = db.get(Branch, r.recipient_id)
-                contacts.extend(branch.members)
+                contacts.extend(branch.contacts)
                 continue
 
             if r.type is EmailRecipient.Types.COMMITTEE:

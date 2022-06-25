@@ -1,10 +1,6 @@
 from datetime import datetime
-import json
-
-from api.middleware.authentication import EnforceRoles
-import falcon
 from sqlalchemy.sql.expression import func
-from falcon.errors import HTTPNotFound, HTTPUnauthorized, HTTPBadRequest, HTTPForbidden
+from falcon.errors import HTTPNotFound, HTTPBadRequest, HTTPForbidden
 from model.Address import Address, AddressNote, Postcode, Street, SurveyReturn
 from model.Contact import Contact
 from services.permissions import trusted_user
@@ -98,7 +94,6 @@ class AddressResource:
             raise HTTPNotFound
 
         resp.context.media = addr
-        resp.context.action = "view"
 
     def on_put_notes(self, req, resp, uprn):
         """
@@ -228,7 +223,6 @@ class StreetResource:
     def on_get(self, req, resp):
         """
         Return a list of streets for a given postcode sector
-        * If a district is entered (i.e. PE2) then a list of sectors is returned.
         """
         try:
             trusted_user(req.context.user)
@@ -255,4 +249,3 @@ class StreetResource:
         )
 
         resp.context.media = streets
-        resp.context.action = "view"

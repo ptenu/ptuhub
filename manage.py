@@ -45,16 +45,5 @@ def add_contact(given_name, family_name, email):
     click.echo("Contact added to database")
 
 
-@cli.command()
-@click.argument("contact_id")
-@click.argument("password")
-def chg_password(contact_id: int, password: str):
-    if not set_password(contact_id=contact_id, password=password):
-        click.echo("\u001b[31mThere was a problem setting the password.\u001b[0m")
-        return
-
-    click.echo("\u001b[32mPassword set.\u001b[0m")
-
-
 if __name__ == "__main__":
     cli()

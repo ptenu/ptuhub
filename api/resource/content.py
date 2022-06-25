@@ -1,6 +1,5 @@
 from falcon.errors import HTTPNotFound, HTTPForbidden
 from falcon.status_codes import HTTP_204
-import api.middleware.authentication as auth
 from api.interface.cms import ContentInterface
 
 from services.permissions import InvalidPermissionError, user_has_role
