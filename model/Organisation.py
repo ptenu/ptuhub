@@ -146,7 +146,7 @@ class Role(Model):
     def __schema__(self):
         return Schema(
             self,
-            ["id", "role_title"],
+            ["id", "title"],
             custom_fields={
                 "contact": {"id": self.contact.id, "name": self.contact.name},
                 "held_since": self.held_since.isoformat(),

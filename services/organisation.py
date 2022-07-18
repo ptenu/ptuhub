@@ -43,7 +43,7 @@ def get_membership_status(contact):
     )
 
     if recent_valid_payments == 0:
-        return "LAPPSED"
+        return "LAPSED"
 
     # if recent_valid_payments < 3:
     #     return "ARREARS"

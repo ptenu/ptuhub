@@ -24,9 +24,41 @@ class ContactsResource:
         """
         Get a list of contacts
         """
+
+        q = req.params
+
+        if len(q) < 1:
+            raise HTTPBadRequest(
+                description="There are a lot of contacts, you must provide a search query."
+            )
+
         contacts_qry = self.session.query(Contact)
 
-        contacts = contacts_qry.order_by(Contact.family_name).limit(15).all()
+        limit = 0
+
+        if "given_name" in q:
+            limit = 15
+            contacts_qry = contacts_qry.filter(
+                Contact.given_name.ilike("%" + q["given_name"] + "%")
+            )
+
+        if "family_name" in q:
+            limit = 15
+            contacts_qry = contacts_qry.filter(
+                Contact.family_name.ilike("%" + q["family_name"] + "%")
+            )
+
+        if "membership_number" in q:
+            limit = 5
+            contacts_qry = contacts_qry.filter(
+                Contact.membership_number.ilike("%" + q["membership_number"] + "%")
+            )
+
+        contacts = (
+            contacts_qry.order_by(Contact.family_name, Contact.membership_number.desc())
+            .limit(limit)
+            .all()
+        )
 
         resp.context.media = contacts
         resp.context.fields = [
@@ -34,6 +66,7 @@ class ContactsResource:
             "name",
             "legal_name",
             "membership_number",
+            "membership_status",
             "avatar_url",
         ]
 
@@ -79,10 +112,15 @@ class ContactsResource:
 
         resp.context.media = new_contact
 
-    def on_get_single(self, req, resp, id):
+    def on_get_single(self, req, resp, id: int):
         """
         Return a single contact
         """
+
+        try:
+            id = int(id)
+        except:
+            raise HTTPBadRequest(description="The contact ID provided was invalid.")
 
         contact = self.session.query(Contact).get(id)
         if contact is None:

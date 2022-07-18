@@ -21,14 +21,25 @@ class EmailMessage(Model):
         SCHEDULED = auto()
         SENT = auto()
         ARCHIVED = auto()
+        RENDERING = auto()
+        SENDING = auto()
+
+    class Priorities(Enum):
+        TRANSACTIONAL = 0
+        CONSTITUTIONAL = 10
+        MEMBERSHIP = 20
+        MARKETING = 100
+        REPORT = 50
 
     id = Column(Integer, primary_key=True)
     subject = Column(String(1024), nullable=False)
-    text = Column(Text)
-    html = Column(Text)
+    message = Column(Text)
+    template = Column(String(1024), nullable=False, default="basic")
     send_after = Column(DateTime, default=None, nullable=True)
-    status = Column(EnumColumn(Statuses), default=Statuses.DRAFT)
-    type = Column(String(15), nullable=False, default="transactional")
+    _status = Column(EnumColumn(Statuses, name="email_status"), default=Statuses.DRAFT)
+    priority = Column(
+        EnumColumn(Priorities), nullable=False, default=Priorities.MARKETING
+    )
 
     # Meta
     _created_on = Column(DateTime, default="NOW()")
@@ -42,8 +53,16 @@ class EmailMessage(Model):
     )
 
     def view_guard(self, user):
-        if e2b(trusted_user(user)) == False:
+        if not e2b(trusted_user(user)):
             return False
+
+    @property
+    def status(self):
+        return self._status
+
+    @status.setter
+    def status(self, value):
+        self._status = value
 
 
 class EmailRecipient(Model):
@@ -87,6 +106,12 @@ class EmailDelivery(Model):
 
     __tablename__ = "email_deliveries"
 
+    class Statuses(Enum):
+        PENDING = auto()
+        SENT = auto()
+        DELIVERED = auto()
+        READ = auto()
+
     message_id = Column(
         Integer, ForeignKey("emails.id", ondelete="CASCADE"), primary_key=True
     )
@@ -95,7 +120,11 @@ class EmailDelivery(Model):
         ForeignKey("contacts.id", onupdate="CASCADE", ondelete="SET NULL"),
         primary_key=True,
     )
-    status = Column(String(20), nullable=False, default="pending")
+    status = Column(
+        EnumColumn(Statuses, name="delivery_statuses"),
+        nullable=False,
+        default=Statuses.PENDING,
+    )
 
     # Meta
     _created_on = Column(DateTime, default=datetime.now())
@@ -103,3 +132,7 @@ class EmailDelivery(Model):
 
     email = relationship(EmailMessage, backref="deliveries")
     contact = relationship("Contact", backref="emails_recieved")
+
+    def __init__(self, email_id, contact_id):
+        self.contact_id = contact_id
+        self.message_id = email_id
